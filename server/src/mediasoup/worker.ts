@@ -1,21 +1,32 @@
 import * as mediasoup from "mediasoup";
+import os from "os";
 
-let worker: mediasoup.types.Worker;
+let workers: mediasoup.types.Worker[] = [];
 
-export async function createMediaSoupWorker() {
-  worker = await mediasoup.createWorker({
-    rtcMinPort: 2000,
-    rtcMaxPort: 2020,
-  });
+let nextWorkerIndex: number = 0;
 
-  console.log("Mediasoup worker created");
+export async function createMediasoupWorkerPool() {
+    const numCores = os.cpus().length;
 
-  return worker;
+    for (let i = 0; i < numCores; i++) {
+        const worker = await mediasoup.createWorker({
+            rtcMinPort: 40000,
+            rtcMaxPort: 49999,
+        });
+
+        worker.on("died", () => {
+            console.error("Mediasoup worker died, exiting...");
+            process.exit(1);
+        });
+
+        workers.push(worker);
+    }
+
+    console.log("Mediasoup workers created: ", workers.length);
 }
 
-export function getMediasoupWorker() {
-  if (!worker) {
-    throw new Error("Worker not initialized");
-  }
-  return worker;
+export function getMediasoupWorkerFromPool() {
+    let worker = workers[nextWorkerIndex];
+    nextWorkerIndex = (nextWorkerIndex + 1) % workers.length;
+    return worker;
 }

@@ -1,231 +1,133 @@
 import { Server } from "socket.io";
 import {
-  createRoom,
-  getRoom,
-  addParticipant,
-  removeParticipant,
+    createRoom,
+    getRoom,
+    addParticipant,
+    removeParticipant,
 } from "../rooms/roomManager";
-import { Participant } from "../rooms/roomManager";
-import { createMediasoupWebRtcTransport } from "../mediasoup/transport";
 
 export function registerSocketHandlers(io: Server) {
-  io.on("connection", (socket) => {
-    console.log("Connected:", socket.id);
+    io.on("connection", (socket) => {
+        socket.on("create-room", async (user, callback) => {
+            const roomId = crypto.randomUUID().slice(0, 8);
 
-    socket.on("create-room", async (user, callback) => {
-      const roomId = crypto.randomUUID().slice(0, 8);
+            const room = await createRoom(roomId, user, socket.id);
 
-      const participant: Participant = {
-        socketId: socket.id,
-        ...user,
-      };
+            socket.join(roomId);
 
-      const room = await createRoom(roomId, participant);
+            callback({ roomId });
 
-      socket.join(roomId);
+            io.to(roomId).emit(
+                "room-participants",
+                Array.from(room.peers.values()),
+            );
+        });
 
-      callback({ roomId });
+        socket.on("join-room", ({ roomId, user }, callback) => {
+            const room = getRoom(roomId);
+            if (!room) return callback({ error: "Room not found" });
 
-      io.to(roomId).emit(
-        "room-participants",
-        Array.from(room.participants.values()),
-      );
-    });
+            addParticipant(roomId, user, socket.id);
 
-    socket.on("join-room", ({ roomId, user }, callback) => {
-      const room = getRoom(roomId);
-      if (!room) return callback({ error: "Room not found" });
+            socket.join(roomId);
 
-      const participant: Participant = {
-        socketId: socket.id,
-        ...user,
-      };
+            callback({ success: true });
 
-      addParticipant(roomId, participant);
+            io.to(roomId).emit(
+                "room-participants",
+                Array.from(room.peers.values()),
+            );
+        });
 
-      socket.join(roomId);
+        socket.on("disconnect", () => {
+            const room = removeParticipant(socket.id);
 
-      callback({ success: true });
+            if (room) {
+                io.to(room.id).emit(
+                    "room-participants",
+                    Array.from(room.peers.values()),
+                );
+            }
+        });
 
-      io.to(roomId).emit(
-        "room-participants",
-        Array.from(room.participants.values()),
-      );
-    });
+        socket.on("get-peer-transport-data", (roomId, callback) => {
+            const room = getRoom(roomId);
+            if (!room) return callback({ error: "Room not found" });
 
-    socket.on("disconnect", () => {
-      const room = removeParticipant(socket.id);
+            const peer = room.peers.get(socket.id);
+            if (!peer) return callback({ error: "Peer not found" });
 
-      if (room) {
-        io.to(room.id).emit(
-          "room-participants",
-          Array.from(room.participants.values()),
+            callback({
+                routerRtpCapabilities: room.mediasoupRouter.rtpCapabilities,
+                sendTransportParams: peer.mediasoupSendTransportParams,
+                recvTransportParams: peer.mediasoupRecvTransportParams,
+            });
+        });
+
+        socket.on(
+            "connect-transport",
+            async ({ roomId, transportId, dtlsParameters }, callback) => {
+                const room = getRoom(roomId);
+                if (!room) return callback({ error: "Room not found" });
+
+                const peer = room.peers.get(socket.id);
+                if (!peer) return callback({ error: "Peer not found" });
+
+                let transport;
+
+                //getting the transports of the user and connecting the dtls paramerets
+                if (peer.mediasoupSendTransport.id === transportId) {
+                    transport = peer.mediasoupSendTransport;
+                } else if (peer.mediasoupRecvTransport.id === transportId) {
+                    transport = peer.mediasoupRecvTransport;
+                }
+
+                if (!transport) {
+                    return callback({ error: "Transport not found" });
+                }
+
+                await transport.connect({ dtlsParameters });
+
+                callback({});
+            },
         );
-      }
-    });
 
-    socket.on("getRouterRtpCapabilities", ({ roomId }, callback) => {
-      const room = getRoom(roomId);
-      if (!room) return callback({ error: "Room not found" });
+        socket.on(
+            "produce",
+            async ({ roomId, transportId, kind, rtpParameters }, callback) => {
+                const room = getRoom(roomId);
+                if (!room) return callback({ error: "Room not found" });
 
-      callback(room.mediasoupRouter.rtpCapabilities); //sending the router capabilities
-    });
+                const peer = room.peers.get(socket.id);
+                if (!peer) return callback({ error: "Peer not found" });
 
-    socket.on(
-      "createWebRtcTransport",
-      async ({ roomId, direction }, callback) => {
-        const room = getRoom(roomId);
-        if (!room) return callback({ error: "Room not found" });
+                let transport;
 
-        const transport = await createMediasoupWebRtcTransport(
-          room.mediasoupRouter,
+                if (peer.mediasoupSendTransport.id === transportId) {
+                    transport = peer.mediasoupSendTransport;
+                }
+
+                if (!transport) {
+                    return callback({ error: "Transport not found" });
+                }
+
+                const producer = await transport.produce({
+                    kind,
+                    rtpParameters,
+                });
+
+                peer.producers.set(producer.id, producer);
+
+                producer.on("transportclose", () => {
+                    peer.producers.delete(producer.id);
+                });
+
+                producer.on("@close", () => {
+                    peer.producers.delete(producer.id);
+                });
+
+                callback({ id: producer.id });
+            },
         );
-
-        let peer = room.peers.get(socket.id);
-
-        if (!peer) {
-          peer = {
-            socketId: socket.id,
-            transports: new Map(),
-            producers: new Map(),
-            consumers: new Map(),
-          };
-          room.peers.set(socket.id, peer);
-        }
-        (transport as any)._direction = direction;
-        peer.transports.set(transport.id, transport);
-
-        callback({
-          id: transport.id,
-          iceParameters: transport.iceParameters,
-          iceCandidates: transport.iceCandidates,
-          dtlsParameters: transport.dtlsParameters,
-        });
-      },
-    );
-
-    socket.on(
-      "connectTransport",
-      async ({ roomId, transportId, dtlsParameters }, callback) => {
-        const room = getRoom(roomId);
-        if (!room) return callback({ error: "Room not found" });
-
-        const peer = room.peers.get(socket.id);
-        if (!peer) return callback({ error: "Peer not found" });
-
-        const transport = peer.transports.get(transportId);
-        if (!transport) return callback({ error: "Transport not found" });
-
-        await transport.connect({ dtlsParameters });
-
-        callback({ connected: true });
-      },
-    );
-
-    socket.on("getProducers", ({ roomId }, callback) => {
-      const room = getRoom(roomId);
-      if (!room) return callback([]);
-
-      const producers: { producerId: string }[] = [];
-      for (const [peerId, peer] of room.peers.entries()) {
-        if (peerId === socket.id) continue; // skip self
-        for (const producerId of peer.producers.keys()) {
-          producers.push({ producerId });
-        }
-      }
-      callback(producers);
     });
-
-    socket.on(
-      "produce",
-      async (
-        { roomId, transportId, kind, rtpParameters, appData },
-        callback,
-      ) => {
-        const room = getRoom(roomId);
-        if (!room) return callback({ error: "Room not found" });
-
-        const peer = room.peers.get(socket.id);
-        if (!peer) return callback({ error: "Peer not found" });
-
-        const transport = peer.transports.get(transportId);
-        if (!transport) return callback({ error: "Transport not found" });
-
-        const producer = await transport.produce({
-          kind,
-          rtpParameters,
-          appData,
-        });
-        peer.producers.set(producer.id, producer);
-        socket.to(roomId).emit("newProducer", {
-          producerId: producer.id,
-          socketId: socket.id,
-        });
-        callback({ id: producer.id });
-      },
-    );
-
-    socket.on(
-      "consume",
-      async ({ roomId, producerId, rtpCapabilities }, callback) => {
-        const room = getRoom(roomId);
-        if (!room) return callback({ error: "Room not found" });
-
-        const peer = room.peers.get(socket.id);
-        if (!peer) return callback({ error: "Peer not found" });
-
-        const transport = Array.from(peer.transports.values()).find(
-          (t) => (t as any)._direction === "recv",
-        );
-        if (!transport) return callback({ error: "No recv transport" });
-
-        if (!room.mediasoupRouter.canConsume({ producerId, rtpCapabilities })) {
-          return callback({ error: "Cannot consume this producer" });
-        }
-
-        const consumer = await transport.consume({
-          producerId,
-          rtpCapabilities,
-          paused: false,
-        });
-
-        peer.consumers.set(consumer.id, consumer);
-        consumer.on("transportclose", () => consumer.close());
-        consumer.on("producerclose", () => consumer.close());
-
-        // Find who owns this producer
-        let producerSocketId = "";
-        for (const [peerId, p] of room.peers.entries()) {
-          if (p.producers.has(producerId)) {
-            producerSocketId = peerId;
-            break;
-          }
-        }
-
-        callback({
-          id: consumer.id,
-          producerId,
-          kind: consumer.kind,
-          rtpParameters: consumer.rtpParameters,
-          socketId: producerSocketId, // ← was missing
-          appData: consumer.appData,
-        });
-      },
-    );
-
-    socket.on("resumeConsumer", async ({ roomId, consumerId }, callback) => {
-      const room = getRoom(roomId);
-      if (!room) return callback({ error: "Room not found" });
-
-      const peer = room.peers.get(socket.id);
-      if (!peer) return callback({ error: "Peer not found" });
-
-      const consumer = peer.consumers.get(consumerId);
-      if (!consumer) return callback({ error: "Consumer not found" });
-
-      await consumer.resume();
-
-      callback({ resumed: true });
-    });
-  });
 }

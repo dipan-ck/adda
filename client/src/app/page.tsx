@@ -14,78 +14,78 @@ import { Card, CardContent } from "@/components/ui/card";
 import RoomUI from "@/components/RoomUi";
 
 export default function Home() {
-  const { user, setUser } = useUserStore();
-  const { isInRoom, setRoom } = useRoomStore();
+    const { user, setUser } = useUserStore();
+    const { isInRoom, setRoom } = useRoomStore();
 
-  const [roomIdInput, setRoomIdInput] = useState("");
+    const [roomIdInput, setRoomIdInput] = useState("");
 
-  // Generate identity once
-  useEffect(() => {
-    if (!user) {
-      setUser(generateUser());
-    }
-  }, [user, setUser]);
-
-  if (!user) return null;
-
-  if (isInRoom) {
-    return <RoomUI />;
-  }
-
-  const handleCreateRoom = () => {
-    socket.connect();
-    socket.emit("create-room", user, (response: any) => {
-      if (!response?.roomId) return;
-      setRoom(response.roomId);
-    });
-  };
-
-  const handleJoinRoom = () => {
-    if (!roomIdInput.trim()) return;
-    socket.connect();
-    socket.emit(
-      "join-room",
-      { roomId: roomIdInput.trim(), user },
-      (response: any) => {
-        if (response?.error) {
-          alert(response.error);
-          return;
+    // Generate identity once
+    useEffect(() => {
+        if (!user) {
+            setUser(generateUser());
         }
-        setRoom(roomIdInput.trim());
-      },
+    }, [user, setUser]);
+
+    if (!user) return null;
+
+    if (isInRoom) {
+        return <RoomUI />;
+    }
+
+    const handleCreateRoom = () => {
+        socket.connect();
+        socket.emit("create-room", user, (response: any) => {
+            if (!response?.roomId) return;
+            setRoom(response.roomId);
+        });
+    };
+
+    const handleJoinRoom = () => {
+        if (!roomIdInput.trim()) return;
+        socket.connect();
+        socket.emit(
+            "join-room",
+            { roomId: roomIdInput.trim(), user },
+            (response: any) => {
+                if (response?.error) {
+                    alert(response.error);
+                    return;
+                }
+                setRoom(roomIdInput.trim());
+            },
+        );
+    };
+
+    return (
+        <div className="flex items-center justify-center min-h-screen p-4">
+            <Card className="w-full border-none bg-transparent max-w-md">
+                <CardContent className="flex flex-col items-center gap-6">
+                    <Image
+                        src={user.avatarUrl}
+                        alt="avatar"
+                        width={90}
+                        height={90}
+                        className="rounded-full"
+                    />
+
+                    <div className="text-lg font-medium">{user.username}</div>
+
+                    <div className="w-full flex flex-col gap-4">
+                        <Input
+                            className="border-0 border-b-2 text-2xl! text-center rounded-none bg-background shadow-none focus-visible:ring-0 focus-visible:border-primary"
+                            placeholder="Enter Room ID"
+                            value={roomIdInput}
+                            onChange={(e) => setRoomIdInput(e.target.value)}
+                        />
+
+                        <Button onClick={handleJoinRoom}>Join Room</Button>
+
+                        <Button variant="secondary" onClick={handleCreateRoom}>
+                            Create Room
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
     );
-  };
-
-  return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <Card className="w-full border-none bg-transparent max-w-md">
-        <CardContent className="flex flex-col items-center gap-6">
-          <Image
-            src={user.avatarUrl}
-            alt="avatar"
-            width={90}
-            height={90}
-            className="rounded-full"
-          />
-
-          <div className="text-lg font-medium">{user.username}</div>
-
-          <div className="w-full flex flex-col gap-4">
-            <Input
-              className="border-0 border-b-2 !text-2xl text-center rounded-none bg-background shadow-none focus-visible:ring-0 focus-visible:border-primary"
-              placeholder="Enter Room ID"
-              value={roomIdInput}
-              onChange={(e) => setRoomIdInput(e.target.value)}
-            />
-
-            <Button onClick={handleJoinRoom}>Join Room</Button>
-
-            <Button variant="secondary" onClick={handleCreateRoom}>
-              Create Room
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
 }
