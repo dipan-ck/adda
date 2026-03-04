@@ -1,7 +1,7 @@
 import { getMediasoupWorkerFromPool } from "./worker";
 import * as mediasoup from "mediasoup";
 
-const mediaCodecs = [
+const mediaCodecs: mediasoup.types.RouterRtpCodecCapability[] = [
     {
         kind: "audio",
         mimeType: "audio/opus",

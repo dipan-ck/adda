@@ -11,7 +11,7 @@ export async function createMediasoupWorkerPool() {
     for (let i = 0; i < numCores; i++) {
         const worker = await mediasoup.createWorker({
             rtcMinPort: 40000,
-            rtcMaxPort: 49999,
+            rtcMaxPort: 40100,
         });
 
         worker.on("died", () => {

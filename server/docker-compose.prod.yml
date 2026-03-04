@@ -1,0 +1,11 @@
+services:
+    server:
+        container_name: adda-server
+        image: dipan2003/adda:latest
+        ports:
+            - "8008:8008"
+            - "40000-40100:40000-40100/udp"
+            - "40000-40100:40000-40100/tcp"
+        env_file:
+            - .env
+        restart: always

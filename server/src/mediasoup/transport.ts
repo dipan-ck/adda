@@ -1,13 +1,15 @@
 import * as mediasoup from "mediasoup";
 
+const announcedIp = process.env.ANNOUNCED_IP || "127.0.0.1";
+
 export async function createMediasoupWebRtcTransport(
     router: mediasoup.types.Router,
 ) {
     const transport = await router.createWebRtcTransport({
         listenIps: [
             {
-                ip: "127.0.0.1", //for dev tunnes: 0.0.0.0 and for localhost 127.0.0.1
-                //announcedIp: "sffxkn5q-8000.inc1.devtunnels.ms", // change in production //for dev tunnels:    announcedIp: "sffxkn5q-8000.inc1.devtunnels.ms",
+                ip: "0.0.0.0",
+                announcedIp,
             },
         ],
         enableUdp: true,

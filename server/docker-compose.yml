@@ -1,0 +1,14 @@
+services:
+    server:
+        container_name: adda-server
+        build:
+            context: .
+        ports:
+            - "8008:8008"
+            - "40000-40100:40000-40100/udp" # ⭐ Mediasoup RTC ports
+            - "40000-40100:40000-40100/tcp" # ⭐ Mediasoup RTC ports
+        env_file:
+            - .env
+        restart: unless-stopped
+
+# docker compose up --build
