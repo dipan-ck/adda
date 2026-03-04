@@ -1,6 +1,7 @@
 import { getMediasoupWorkerFromPool } from "./worker";
+import * as mediasoup from "mediasoup";
 
-export const mediaCodecs = [
+const mediaCodecs = [
     {
         kind: "audio",
         mimeType: "audio/opus",
@@ -9,9 +10,20 @@ export const mediaCodecs = [
     },
     {
         kind: "video",
+        mimeType: "video/H264",
+        clockRate: 90000,
+        parameters: {
+            "packetization-mode": 1,
+            "level-asymmetry-allowed": 1,
+        },
+    },
+    {
+        kind: "video",
         mimeType: "video/VP8",
         clockRate: 90000,
-        parameters: {},
+        parameters: {
+            "x-google-start-bitrate": 3000,
+        },
     },
 ];
 

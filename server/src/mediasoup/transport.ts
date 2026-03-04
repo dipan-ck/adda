@@ -6,13 +6,15 @@ export async function createMediasoupWebRtcTransport(
     const transport = await router.createWebRtcTransport({
         listenIps: [
             {
-                ip: "0.0.0.0",
-                // announcedIp: "YOUR_PUBLIC_IP", // change in production
+                ip: "127.0.0.1", //for dev tunnes: 0.0.0.0 and for localhost 127.0.0.1
+                //announcedIp: "sffxkn5q-8000.inc1.devtunnels.ms", // change in production //for dev tunnels:    announcedIp: "sffxkn5q-8000.inc1.devtunnels.ms",
             },
         ],
         enableUdp: true,
         enableTcp: true,
         preferUdp: true,
+        initialAvailableOutgoingBitrate: 10_000_000,
+        maxSctpMessageSize: 262144,
     });
 
     return {

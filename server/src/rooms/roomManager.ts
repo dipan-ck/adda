@@ -6,14 +6,13 @@ export type Peer = {
     userId: string;
     username: string;
     avatarUrl: string;
-
     mediasoupSendTransport: mediasoup.types.WebRtcTransport;
     mediasoupRecvTransport: mediasoup.types.WebRtcTransport;
-
     mediasoupSendTransportParams: any;
     mediasoupRecvTransportParams: any;
-
     producers: Map<string, mediasoup.types.Producer>;
+    // consumers keyed by consumerId — needed for server-side resume
+    consumers: Map<string, mediasoup.types.Consumer>;
 };
 
 export type Room = {
@@ -24,7 +23,7 @@ export type Room = {
 
 let rooms = new Map<string, Room>();
 
-export async function createRoom(roomId: string, peer: Peer, sockerId: string) {
+export async function createRoom(roomId: string, peer: Peer, socketId: string) {
     const room: Room = {
         id: roomId,
         peers: new Map(),
@@ -41,10 +40,10 @@ export async function createRoom(roomId: string, peer: Peer, sockerId: string) {
         mediasoupSendTransportParams: send.params,
         mediasoupRecvTransportParams: recv.params,
         producers: new Map(),
+        consumers: new Map(),
     };
 
-    room.peers.set(sockerId, peer);
-
+    room.peers.set(socketId, peer);
     rooms.set(roomId, room);
     return room;
 }
@@ -71,6 +70,7 @@ export async function addParticipant(
         mediasoupSendTransportParams: send.params,
         mediasoupRecvTransportParams: recv.params,
         producers: new Map(),
+        consumers: new Map(),
     };
 
     room.peers.set(socketId, peer);
@@ -78,21 +78,43 @@ export async function addParticipant(
 }
 
 export function removeParticipant(socketId: string) {
-    for (const [roomId, room] of rooms.entries()) {
+    for (const [, room] of rooms.entries()) {
         const peer = room.peers.get(socketId);
-
         if (peer) {
             peer.mediasoupSendTransport?.close();
             peer.mediasoupRecvTransport?.close();
-
             room.peers.delete(socketId);
-
             if (room.peers.size === 0) {
                 room.mediasoupRouter.close();
-                rooms.delete(roomId);
+                rooms.delete(room.id);
             }
-
             return room;
+        }
+    }
+    return null;
+}
+
+export function getRoomParticipants(room: Room) {
+    return Array.from(room.peers.values()).map((peer) => ({
+        userId: peer.userId,
+        username: peer.username,
+        avatarUrl: peer.avatarUrl,
+    }));
+}
+
+/**
+ * Find a consumer owned by a specific socket across all rooms.
+ * Used by the resume-consumer handler which needs to look up by consumerId.
+ */
+export function findPeerConsumer(
+    socketId: string,
+    consumerId: string,
+): mediasoup.types.Consumer | null {
+    for (const room of rooms.values()) {
+        const peer = room.peers.get(socketId);
+        if (peer) {
+            const consumer = peer.consumers.get(consumerId);
+            if (consumer) return consumer;
         }
     }
     return null;
