@@ -102,10 +102,6 @@ export function getRoomParticipants(room: Room) {
     }));
 }
 
-/**
- * Find a consumer owned by a specific socket across all rooms.
- * Used by the resume-consumer handler which needs to look up by consumerId.
- */
 export function findPeerConsumer(
     socketId: string,
     consumerId: string,

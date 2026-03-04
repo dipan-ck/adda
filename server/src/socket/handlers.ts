@@ -10,8 +10,6 @@ import {
 
 export function registerSocketHandlers(io: Server) {
     io.on("connection", (socket) => {
-        /* ──────────────────────────────── ROOM ──────────────────────────────── */
-
         socket.on("create-room", async (user, callback) => {
             const roomId = crypto.randomUUID().slice(0, 8);
             const room = await createRoom(roomId, user, socket.id);
@@ -44,8 +42,6 @@ export function registerSocketHandlers(io: Server) {
                 );
             }
         });
-
-        /* ─────────────────────────── TRANSPORT ──────────────────────────────── */
 
         socket.on("get-peer-transport-data", (roomId, callback) => {
             const room = getRoom(roomId);
@@ -98,8 +94,6 @@ export function registerSocketHandlers(io: Server) {
                 callback({});
             },
         );
-
-        /* ──────────────────────────── PRODUCE ───────────────────────────────── */
 
         socket.on(
             "produce",
@@ -155,8 +149,6 @@ export function registerSocketHandlers(io: Server) {
             },
         );
 
-        /* ────────────────────────── CLOSE PRODUCER ──────────────────────────── */
-
         socket.on(
             "close-producer",
             ({
@@ -179,8 +171,6 @@ export function registerSocketHandlers(io: Server) {
                 producer.close();
             },
         );
-
-        /* ──────────────────────────── CONSUME ───────────────────────────────── */
 
         socket.on(
             "consume",
@@ -231,11 +221,6 @@ export function registerSocketHandlers(io: Server) {
             },
         );
 
-        /* ────────────────────────── RESUME CONSUMER ─────────────────────────── */
-
-        // Called by the client AFTER it has attached stream.srcObject to a video
-        // element and the element has begun rendering. Only then do we resume the
-        // server-side consumer and request a keyframe from the producer.
         socket.on(
             "resume-consumer",
             async (
@@ -245,7 +230,6 @@ export function registerSocketHandlers(io: Server) {
                 const consumer = findPeerConsumer(socket.id, consumerId);
 
                 if (!consumer) {
-                    // Consumer may have already been closed — not a fatal error
                     return callback({ error: "Consumer not found" });
                 }
 
