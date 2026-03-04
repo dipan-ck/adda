@@ -5,8 +5,8 @@ services:
             context: .
         ports:
             - "8008:8008"
-            - "42000-42100:42000-42100/udp" # ⭐ Mediasoup RTC ports
-            - "42000-42100:42000-42100/tcp" # ⭐ Mediasoup RTC ports
+            - "42000-42100:42000-42100/udp"
+            - "42000-42100:42000-42100/tcp"
         env_file:
             - .env
         restart: unless-stopped
