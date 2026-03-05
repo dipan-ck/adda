@@ -9,15 +9,15 @@ dotenv.config();
 const PORT = process.env.PORT || 8000;
 
 async function start() {
-    const httpServer = http.createServer(app);
+  const httpServer = http.createServer(app);
 
-    await createMediasoupWorkerPool();
+  await createMediasoupWorkerPool();
 
-    initSocket(httpServer);
+  initSocket(httpServer);
 
-    httpServer.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 }
 
 start();

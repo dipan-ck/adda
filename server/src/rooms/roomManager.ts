@@ -1,117 +1,252 @@
+import { Socket } from "socket.io";
 import * as mediasoup from "mediasoup";
-import { createMediasoupRouter } from "../mediasoup/router";
-import { createMediasoupWebRtcTransport } from "../mediasoup/transport";
+import { create_mediasoup_router } from "../mediasoup/router";
+import { create_mediasoup_WebRtcTransport } from "../mediasoup/transport";
+import { get } from "http";
+
+export type User = {
+    userId: string;
+    username: string;
+    avatarUrl: string;
+};
 
 export type Peer = {
     userId: string;
     username: string;
     avatarUrl: string;
+
     mediasoupSendTransport: mediasoup.types.WebRtcTransport;
     mediasoupRecvTransport: mediasoup.types.WebRtcTransport;
+
     mediasoupSendTransportParams: any;
     mediasoupRecvTransportParams: any;
+
     producers: Map<string, mediasoup.types.Producer>;
-    // consumers keyed by consumerId — needed for server-side resume
     consumers: Map<string, mediasoup.types.Consumer>;
 };
 
-export type Room = {
+type Room = {
     id: string;
     peers: Map<string, Peer>;
     mediasoupRouter: mediasoup.types.Router;
 };
 
-let rooms = new Map<string, Room>();
+let Rooms = new Map<string, Room>();
 
-export async function createRoom(roomId: string, peer: Peer, socketId: string) {
-    const room: Room = {
-        id: roomId,
+export function get_room(roomId: string): Room | null {
+    if (Rooms.has(roomId)) {
+        return Rooms.get(roomId)!;
+    }
+
+    return null;
+}
+
+export function get_peer(room: Room, socket: Socket): Peer | null {
+    if (room) {
+        return room.peers.get(socket.id) ?? null;
+    }
+
+    return null;
+}
+
+export async function create_room(socket: Socket, user: User) {
+    let room: Room = {
+        id: crypto.randomUUID().toString().slice(0, 8),
         peers: new Map(),
-        mediasoupRouter: await createMediasoupRouter(),
+        mediasoupRouter: await create_mediasoup_router(),
     };
 
-    const send = await createMediasoupWebRtcTransport(room.mediasoupRouter);
-    const recv = await createMediasoupWebRtcTransport(room.mediasoupRouter);
+    let { transport: sendTransport, params: sendParams } =
+        await create_mediasoup_WebRtcTransport(room.mediasoupRouter);
 
-    peer = {
-        ...peer,
-        mediasoupSendTransport: send.transport,
-        mediasoupRecvTransport: recv.transport,
-        mediasoupSendTransportParams: send.params,
-        mediasoupRecvTransportParams: recv.params,
+    let { transport: recvTransport, params: recvParams } =
+        await create_mediasoup_WebRtcTransport(room.mediasoupRouter);
+
+    let peer = {
+        ...user,
+        mediasoupSendTransport: sendTransport,
+        mediasoupRecvTransport: recvTransport,
+        mediasoupSendTransportParams: sendParams,
+        mediasoupRecvTransportParams: recvParams,
+
         producers: new Map(),
         consumers: new Map(),
     };
 
-    room.peers.set(socketId, peer);
-    rooms.set(roomId, room);
+    room.peers.set(socket.id, peer);
+    Rooms.set(room.id, room);
+
     return room;
 }
 
-export function getRoom(roomId: string) {
-    return rooms.get(roomId);
-}
-
-export async function addParticipant(
+export async function add_peer_to_room(
     roomId: string,
-    peer: Peer,
-    socketId: string,
+    user: User,
+    socket: Socket,
 ) {
-    const room = rooms.get(roomId);
-    if (!room) return null;
+    const room = Rooms.get(roomId.trim());
 
-    const send = await createMediasoupWebRtcTransport(room.mediasoupRouter);
-    const recv = await createMediasoupWebRtcTransport(room.mediasoupRouter);
+    console.log(roomId);
 
-    peer = {
-        ...peer,
-        mediasoupSendTransport: send.transport,
-        mediasoupRecvTransport: recv.transport,
-        mediasoupSendTransportParams: send.params,
-        mediasoupRecvTransportParams: recv.params,
+    if (!room) {
+        return null;
+    }
+
+    let { transport: sendTransport, params: sendParams } =
+        await create_mediasoup_WebRtcTransport(room.mediasoupRouter);
+
+    let { transport: recvTransport, params: recvParams } =
+        await create_mediasoup_WebRtcTransport(room.mediasoupRouter);
+
+    let peer = {
+        ...user,
+        mediasoupSendTransport: sendTransport,
+        mediasoupRecvTransport: recvTransport,
+        mediasoupSendTransportParams: sendParams,
+        mediasoupRecvTransportParams: recvParams,
+
         producers: new Map(),
         consumers: new Map(),
     };
 
-    room.peers.set(socketId, peer);
+    room.peers.set(socket.id, peer);
     return room;
 }
 
-export function removeParticipant(socketId: string) {
-    for (const [, room] of rooms.entries()) {
-        const peer = room.peers.get(socketId);
-        if (peer) {
-            peer.mediasoupSendTransport?.close();
-            peer.mediasoupRecvTransport?.close();
-            room.peers.delete(socketId);
+export function remove_peer_from_room(socket: Socket): void {
+    for (const [, room] of Rooms) {
+        if (room.peers.has(socket.id)) {
+            room.peers.delete(socket.id);
+
             if (room.peers.size === 0) {
-                room.mediasoupRouter.close();
-                rooms.delete(room.id);
+                Rooms.delete(room.id);
             }
-            return room;
+
+            return;
         }
     }
-    return null;
 }
 
-export function getRoomParticipants(room: Room) {
-    return Array.from(room.peers.values()).map((peer) => ({
-        userId: peer.userId,
-        username: peer.username,
-        avatarUrl: peer.avatarUrl,
-    }));
+export function get_router_capabilities(
+    room: Room,
+    peer: Peer,
+    socket: Socket,
+) {
+    return {
+        routerRtpCapabilities: room.mediasoupRouter.rtpCapabilities,
+        sendTransportParams: peer?.mediasoupSendTransportParams,
+        recvTransportParams: peer?.mediasoupRecvTransportParams,
+    };
 }
 
-export function findPeerConsumer(
-    socketId: string,
-    consumerId: string,
-): mediasoup.types.Consumer | null {
-    for (const room of rooms.values()) {
-        const peer = room.peers.get(socketId);
-        if (peer) {
-            const consumer = peer.consumers.get(consumerId);
-            if (consumer) return consumer;
+export async function connect_trasport(
+    peer: Peer,
+    dtlsParameters: any,
+    transportId: string,
+) {
+    let transport;
+
+    if (transportId == peer.mediasoupSendTransport.id) {
+        transport = peer.mediasoupSendTransport;
+    } else {
+        transport = peer.mediasoupRecvTransport;
+    }
+
+    await transport.connect({ dtlsParameters });
+}
+
+export async function create_producer(
+    roomId: string,
+    socket: Socket,
+    peer: Peer,
+    kind: any,
+    rtpParameters: any,
+    appData: any,
+) {
+    const producer = await peer.mediasoupSendTransport.produce({
+        kind,
+        rtpParameters,
+        appData: appData ?? {},
+    });
+
+    peer.producers.set(producer.id, producer);
+
+    socket.to(roomId).emit("new-producer", {
+        producerId: producer.id,
+        appData: producer.appData,
+    });
+
+    const onClose = () => {
+        peer.producers.delete(producer.id);
+
+        socket.to(roomId).emit("producer-closed", {
+            producerId: producer.id,
+        });
+    };
+
+    producer.on("transportclose", onClose);
+    producer.on("@close", onClose);
+
+    return producer;
+}
+
+export function get_existing_producers_list(roomId: string) {
+    let existingProducers = [];
+    let room = get_room(roomId);
+
+    for (const peer of room?.peers ?? []) {
+        for (const producer of peer.producers.values()) {
+            existingProducers.push(producer);
         }
     }
-    return null;
+
+    return existingProducers;
+}
+
+export function can_consume(
+    room: Room,
+    producerId: string,
+    rtpCapabilities: any,
+): boolean {
+    const router = room.mediasoupRouter;
+
+    if (!router.canConsume({ producerId, rtpCapabilities })) {
+        return false;
+    }
+
+    return true;
+}
+
+export async function create_consumer(
+    peer: Peer,
+    producerId: string,
+    rtpCapabilities: any,
+) {
+    const consumer = await peer.mediasoupRecvTransport.consume({
+        producerId,
+        rtpCapabilities,
+        paused: true,
+    });
+
+    peer.consumers.set(consumer.id, consumer);
+
+    consumer.on("transportclose", () => {
+        peer.consumers.delete(consumer.id);
+    });
+
+    consumer.on("@close", () => {
+        peer.consumers.delete(consumer.id);
+    });
+
+    return consumer;
+}
+
+export function find_peer_consumer(consumerId: string, socket: Socket) {
+    for ([_, room] of Rooms) {
+        const peer = room.peers.get(socket.id);
+
+        if (peer && peer.consumers.has(consumerId)) {
+            return peer.consumers.get(consumerId);
+        }
+    }
 }

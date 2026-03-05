@@ -2,7 +2,7 @@ import * as mediasoup from "mediasoup";
 
 const announcedIp = process.env.ANNOUNCED_IP || "127.0.0.1";
 
-export async function createMediasoupWebRtcTransport(
+export async function create_mediasoup_WebRtcTransport(
     router: mediasoup.types.Router,
 ) {
     const transport = await router.createWebRtcTransport({

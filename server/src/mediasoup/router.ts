@@ -27,7 +27,7 @@ const mediaCodecs: mediasoup.types.RouterRtpCodecCapability[] = [
     },
 ];
 
-export async function createMediasoupRouter() {
+export async function create_mediasoup_router() {
     let worker = getMediasoupWorkerFromPool();
     let router = worker.createRouter({ mediaCodecs });
 

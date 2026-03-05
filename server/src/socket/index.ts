@@ -1,6 +1,6 @@
 import { Server } from "socket.io";
 import { Server as HTTPServer } from "http";
-import { registerSocketHandlers } from "./handlers";
+import { register_socket_handlers } from "./handlers";
 
 export function initSocket(server: HTTPServer) {
     const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -28,5 +28,5 @@ export function initSocket(server: HTTPServer) {
         },
     });
 
-    registerSocketHandlers(io);
+    register_socket_handlers(io);
 }

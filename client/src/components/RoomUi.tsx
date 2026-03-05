@@ -260,21 +260,7 @@ function ScreenShareTile({
     );
 }
 
-/* ─────────────────────────────────────────────────── */
-/* VIDEO ELEMENT — callback ref pattern               */
-/*                                                     */
-/* ROOT CAUSE OF CAMERA BUG:                           */
-/* useRef + useEffect is racy. The effect dependency   */
-/* [cameraStream] fires BEFORE the DOM node is         */
-/* guaranteed to exist if anything caused a remount.   */
-/*                                                     */
-/* CORRECT FIX: use a callback ref. React calls it     */
-/* synchronously when the element mounts/unmounts,     */
-/* so srcObject is set at exactly the right time.      */
-/* Additionally, srcObject is assigned in render too   */
-/* (the if (!el.srcObject) guard from LogRocket docs)  */
-/* so late-arriving streams also work.                 */
-/* ─────────────────────────────────────────────────── */
+
 function VideoEl({
     stream,
     className,
