@@ -1,90 +1,66 @@
-"use client";
 import { create } from "zustand";
+import { socket } from "@/lib/socket";
 
-export type Participant = {
-    userId: string;
-    username: string;
-    avatarUrl: string;
+export type Peer = {
+  userId: string;
+  username: string;
+  avatarUrl: string;
 };
 
 export type VideoStream = {
-    stream: MediaStream;
-    producerId: string;
-    kind: "screen" | "camera";
-    userId?: string;
+  producerId: string;
+  type: "screen" | "camera";
+  stream: MediaStream;
+  userId: string;
 };
 
 type RoomState = {
-    roomId: string | null;
-    isInRoom: boolean;
-    participants: Participant[];
-    selfUserId: string | null;
-    videoStreams: Map<string, VideoStream>;
-    cameraStreamsByUserId: Map<string, MediaStream>;
-    setRoom: (roomId: string, selfUserId: string) => void;
-    setParticipants: (participants: Participant[]) => void;
-    addVideoStream: (entry: VideoStream) => void;
-    removeVideoStream: (producerId: string) => void;
-    removeCameraByUserId: (userId: string) => void;
-    leaveRoom: () => void;
+  roomId: string | null;
+  peers: Peer[];
+  videoStreams: VideoStream[];
+  isInRoom: boolean;
+  setRoom: (roomId: string, peers: Peer[]) => void;
+  leaveRoom: () => void;
+  setPeers: (peers: Peer[]) => void;
+  addVideoStream: (data: VideoStream) => void;
+  removeVideoStream: (producerId: string) => void;
+
+  clearVideoStreams: () => void;
 };
 
-export const useRoomStore = create<RoomState>((set, get) => ({
+export const useRoomStore = create<RoomState>((set) => {
+  socket.on("room-peers-list", (peers: Peer[]) => {
+    set({ peers });
+  });
+
+  return {
     roomId: null,
+    videoStreams: [],
+    peers: [],
     isInRoom: false,
-    participants: [],
-    selfUserId: null,
-    videoStreams: new Map(),
-    cameraStreamsByUserId: new Map(),
 
-    setRoom: (roomId, selfUserId) =>
-        set({ roomId, isInRoom: true, selfUserId }),
+    setRoom: (roomId, peers) => set({ roomId, peers, isInRoom: true }),
 
-    setParticipants: (participants) => set({ participants }),
-
-    addVideoStream: (entry) => {
-        const nextStreams = new Map(get().videoStreams);
-        nextStreams.set(entry.producerId, entry);
-        const nextCameras = new Map(get().cameraStreamsByUserId);
-        if (entry.kind === "camera" && entry.userId) {
-            nextCameras.set(entry.userId, entry.stream);
-        }
-        set({ videoStreams: nextStreams, cameraStreamsByUserId: nextCameras });
+    leaveRoom: () => {
+      socket.disconnect();
+      set({ roomId: null, peers: [], isInRoom: false, videoStreams: [] });
     },
 
-    removeVideoStream: (producerId) => {
-        const existing = get().videoStreams.get(producerId);
-        if (!existing) return;
-        const nextStreams = new Map(get().videoStreams);
-        nextStreams.delete(producerId);
-        const nextCameras = new Map(get().cameraStreamsByUserId);
-        if (existing.kind === "camera" && existing.userId) {
-            nextCameras.delete(existing.userId);
-        }
-        set({ videoStreams: nextStreams, cameraStreamsByUserId: nextCameras });
-    },
+    setPeers: (peers) => set({ peers }),
 
-    // ✅ NEW: remove a camera stream by userId (used when stopping own camera)
-    removeCameraByUserId: (userId) => {
-        const nextCameras = new Map(get().cameraStreamsByUserId);
-        nextCameras.delete(userId);
-        // Also remove from videoStreams
-        const nextStreams = new Map(get().videoStreams);
-        nextStreams.forEach((vs, key) => {
-            if (vs.kind === "camera" && vs.userId === userId) {
-                nextStreams.delete(key);
-            }
-        });
-        set({ videoStreams: nextStreams, cameraStreamsByUserId: nextCameras });
-    },
+    addVideoStream: (data: VideoStream) =>
+      set((state) => ({
+        videoStreams: [...state.videoStreams, data],
+      })),
 
-    leaveRoom: () =>
-        set({
-            roomId: null,
-            isInRoom: false,
-            participants: [],
-            selfUserId: null,
-            videoStreams: new Map(),
-            cameraStreamsByUserId: new Map(),
-        }),
-}));
+    removeVideoStream: (producerId: string) =>
+      set((state) => ({
+        videoStreams: state.videoStreams.filter(
+          (s) => s.producerId !== producerId,
+        ),
+      })),
+
+    // ── NEW ────────────────────────────────────────────────────────────────
+    clearVideoStreams: () => set({ videoStreams: [] }),
+  };
+});
