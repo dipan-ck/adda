@@ -12,6 +12,12 @@ import {
   ChevronUp,
   Camera,
   CameraOff,
+  Share2,
+  Copy,
+  Check,
+  X,
+  Link2,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -37,25 +43,159 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { socket } from "@/lib/socket";
 import { useRoomStore } from "@/store/roomStore";
 import { useState } from "react";
 
-type StreamQuality = "low" | "medium" | "high" | "ultra";
+type ScreenQuality = "480p" | "720p30" | "720p60" | "1080p30" | "1080p60";
 
 const QUALITY_OPTIONS: {
-  value: StreamQuality;
+  value: ScreenQuality;
   label: string;
   desc: string;
   badge: string;
 }[] = [
-  { value: "low", label: "Low", desc: "480p · 15 fps", badge: "480p" },
-  { value: "medium", label: "Medium", desc: "720p · 30 fps", badge: "720p" },
-  { value: "high", label: "High", desc: "1080p · 30 fps", badge: "1080p" },
-  { value: "ultra", label: "Ultra", desc: "1080p · 60 fps", badge: "60fps" },
+  { value: "480p", label: "Low", desc: "480p · 30 fps", badge: "480p" },
+  { value: "720p30", label: "Medium", desc: "720p · 30 fps", badge: "720p" },
+  { value: "720p60", label: "High", desc: "720p · 60 fps", badge: "720p60" },
+  { value: "1080p30", label: "Ultra", desc: "1080p · 30 fps", badge: "1080p" },
+  { value: "1080p60", label: "Max", desc: "1080p · 60 fps", badge: "60fps" },
 ];
+
+function ShareModal({
+  open,
+  onClose,
+  roomId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  roomId: string | null;
+}) {
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const roomLink = `https://adda.dipan.cc?roomId=${roomId}`;
+
+  const handleCopy = async (text: string, type: "id" | "link") => {
+    await navigator.clipboard.writeText(text);
+    if (type === "id") {
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } else {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden gap-0 border border-border">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <Share2 className="h-4 w-4 text-primary" />
+              </div>
+              <DialogTitle className="text-base font-semibold">
+                Invite to room
+              </DialogTitle>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2 text-left">
+            Share the room ID or link so others can join instantly.
+          </p>
+        </DialogHeader>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-3">
+          {/* Room ID row */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+            <div className="p-1.5 rounded-md bg-background border border-border shrink-0">
+              <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-0.5">
+                Room ID
+              </p>
+              <p className="font-mono text-sm font-semibold text-foreground tracking-wider truncate">
+                {roomId}
+              </p>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopy(roomId!, "id")}
+                  className="h-8 w-8 rounded-lg shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  {copiedId ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                {copiedId ? "Copied!" : "Copy ID"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Invite Link row */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+            <div className="p-1.5 rounded-md bg-background border border-border shrink-0">
+              <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-0.5">
+                Invite Link
+              </p>
+              <p className="font-mono text-[11px] text-muted-foreground truncate">
+                {roomLink}
+              </p>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopy(roomLink, "link")}
+                  className="h-8 w-8 rounded-lg shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  {copiedLink ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                {copiedLink ? "Copied!" : "Copy link"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-5">
+          <Button onClick={onClose} className="w-full rounded-xl h-9 text-sm">
+            Done
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function RoomMenuDock({
   mute,
@@ -65,14 +205,16 @@ export default function RoomMenuDock({
   undeafen,
   startScreenShare,
   stopScreenShare,
+  changeScreenShareQuality,
 }: {
   mute: () => void;
   cleanup: () => void;
   unmute: () => void;
   deafen: () => void;
   undeafen: () => void;
-  startScreenShare: () => Promise<void>;
+  startScreenShare: (quality?: ScreenQuality) => Promise<void>;
   stopScreenShare: () => void;
+  changeScreenShareQuality: (quality: ScreenQuality) => Promise<void>;
 }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
@@ -80,11 +222,12 @@ export default function RoomMenuDock({
   const [micVol, setMicVol] = useState(100);
   const [speakerVol, setSpeakerVol] = useState(100);
   const [cameraOn, setCameraOn] = useState(false);
-  const [quality, setQuality] = useState<StreamQuality>("high");
-  const [noisePending, setNoisePending] = useState(false);
+  const [quality, setQuality] = useState<ScreenQuality>("720p60");
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const leaveRoom = useRoomStore((state) => state.leaveRoom);
+  const roomId = useRoomStore((s) => s.roomId);
 
   const handleMuteToggle = () => {
     if (isMuted) {
@@ -112,12 +255,17 @@ export default function RoomMenuDock({
       setIsSharingScreen(false);
     } else {
       try {
-        await startScreenShare();
+        await startScreenShare(quality);
         setIsSharingScreen(true);
       } catch {
         /* user cancelled */
       }
     }
+  };
+
+  const handleQualityChange = async (q: ScreenQuality) => {
+    setQuality(q);
+    if (isSharingScreen) await changeScreenShareQuality(q);
   };
 
   const handleLeave = () => {
@@ -127,90 +275,58 @@ export default function RoomMenuDock({
   };
 
   const currentBadge =
-    QUALITY_OPTIONS.find((o) => o.value === quality)?.badge ?? "1080p";
-
-  // ── Shared icon-button size — larger tap targets on mobile ───────────────
-  const iconBtn =
-    "rounded-xl h-11 w-11 sm:h-10 sm:w-10 touch-manipulation transition-all";
+    QUALITY_OPTIONS.find((o) => o.value === quality)?.badge ?? "720p60";
+  const iconBtn = "rounded-xl h-9 w-9 touch-manipulation transition-all";
 
   return (
     <TooltipProvider delayDuration={0}>
-      {/*
-        The dock is pinned to the bottom.
-        On mobile it spans full width with safe-area padding.
-        On sm+ it floats as a pill.
-      */}
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        roomId={roomId}
+      />
+
       <div
-        className="fixed bottom-0 left-0 right-0 z-50
-                   sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto sm:w-auto"
-        style={{
-          // iOS home bar safe area
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
+        className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {/* Inner container:
-            mobile  = full-width bar with rounded top corners
-            sm+     = floating pill */}
-        <div
-          className="flex items-center justify-center
-                     gap-0 sm:gap-0.5
-                     px-2 sm:px-2 py-2 sm:py-1.5
-                     bg-popover border-t sm:border border-border
-                     rounded-t-2xl sm:rounded-2xl
-                     shadow-lg shadow-black/10
-                     overflow-x-auto sm:overflow-x-visible
-                     scrollbar-none"
-        >
+        <div className="flex items-center justify-center gap-0.5 px-2 py-1.5 bg-popover border border-border rounded-2xl shadow-lg shadow-black/10">
           {/* ══ MIC ══════════════════════════════════════ */}
           <Popover>
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleMuteToggle}
-                    className={`${iconBtn} ${
-                      isMuted
-                        ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    }`}
+                    className={`${iconBtn} ${isMuted ? "bg-destructive/15 text-destructive hover:bg-destructive/25" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
                   >
                     {isMuted ? (
-                      <MicOff className="h-[18px] w-[18px]" />
+                      <MicOff className="h-4 w-4" />
                     ) : (
-                      <Mic className="h-[18px] w-[18px]" />
+                      <Mic className="h-4 w-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent
-                  side="top"
-                  sideOffset={8}
-                  className="hidden sm:block"
-                >
+                <TooltipContent side="top" sideOffset={8}>
                   {isMuted ? "Unmute" : "Mute"}
                 </TooltipContent>
               </Tooltip>
-
-              {/* Chevron hidden on mobile to save space */}
               <PopoverTrigger asChild>
                 <button
-                  className="hidden sm:flex h-8 w-4 items-center justify-center
-                             text-muted-foreground/50 hover:text-muted-foreground
-                             transition-colors focus:outline-none touch-manipulation"
+                  className="flex h-8 w-4 items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors focus:outline-none touch-manipulation"
                   aria-label="Mic settings"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
             </div>
-
             <PopoverContent
               side="top"
               align="start"
               sideOffset={12}
-              // On mobile open upward and fill width sensibly
-              className="w-[min(16rem,90vw)] p-4 rounded-xl"
+              className="w-64 p-4 rounded-xl"
             >
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                 Microphone
@@ -242,7 +358,6 @@ export default function RoomMenuDock({
                   <Switch
                     checked={noiseCancel}
                     onCheckedChange={setNoiseCancel}
-                    disabled={noisePending}
                     className="scale-90"
                   />
                 </div>
@@ -252,52 +367,40 @@ export default function RoomMenuDock({
 
           {/* ══ SPEAKER ══════════════════════════════════ */}
           <Popover>
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleDeafenToggle}
-                    className={`${iconBtn} ${
-                      isDeafened
-                        ? "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/25"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    }`}
+                    className={`${iconBtn} ${isDeafened ? "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/25" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
                   >
                     {isDeafened ? (
-                      <VolumeX className="h-[18px] w-[18px]" />
+                      <VolumeX className="h-4 w-4" />
                     ) : (
-                      <Volume2 className="h-[18px] w-[18px]" />
+                      <Volume2 className="h-4 w-4" />
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent
-                  side="top"
-                  sideOffset={8}
-                  className="hidden sm:block"
-                >
+                <TooltipContent side="top" sideOffset={8}>
                   {isDeafened ? "Undeafen" : "Deafen"}
                 </TooltipContent>
               </Tooltip>
-
               <PopoverTrigger asChild>
                 <button
-                  className="hidden sm:flex h-8 w-4 items-center justify-center
-                             text-muted-foreground/50 hover:text-muted-foreground
-                             transition-colors focus:outline-none touch-manipulation"
+                  className="flex h-8 w-4 items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors focus:outline-none touch-manipulation"
                   aria-label="Speaker settings"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
             </div>
-
             <PopoverContent
               side="top"
               align="start"
               sideOffset={12}
-              className="w-[min(16rem,90vw)] p-4 rounded-xl"
+              className="w-64 p-4 rounded-xl"
             >
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                 Speaker
@@ -331,57 +434,55 @@ export default function RoomMenuDock({
                 variant="ghost"
                 size="icon"
                 onClick={() => setCameraOn((v) => !v)}
-                className={`${iconBtn} shrink-0 ${
-                  cameraOn
-                    ? "bg-primary/15 text-primary hover:bg-primary/25"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
+                className={`${iconBtn} ${cameraOn ? "bg-primary/15 text-primary hover:bg-primary/25" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
               >
                 {cameraOn ? (
-                  <CameraOff className="h-[18px] w-[18px]" />
+                  <CameraOff className="h-4 w-4" />
                 ) : (
-                  <Camera className="h-[18px] w-[18px]" />
+                  <Camera className="h-4 w-4" />
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              sideOffset={8}
-              className="hidden sm:block"
-            >
+            <TooltipContent side="top" sideOffset={8}>
               {cameraOn ? "Stop camera" : "Share camera"}
             </TooltipContent>
           </Tooltip>
 
-          {/* ══ SCREEN SHARE ═════════════════════════════
-              Hidden on mobile — screen sharing from phones is rarely useful
-              and getDisplayMedia is not widely supported on mobile browsers.
-          ══ */}
+          {/* ══ SCREEN SHARE ═════════════════════════════ */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleScreenShare}
-                className={`${iconBtn} shrink-0 hidden sm:inline-flex ${
-                  isSharingScreen
-                    ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                }`}
+                className={`${iconBtn} ${isSharingScreen ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25" : "text-muted-foreground hover:text-foreground hover:bg-accent"}`}
               >
                 {isSharingScreen ? (
-                  <MonitorOff className="h-[18px] w-[18px]" />
+                  <MonitorOff className="h-4 w-4" />
                 ) : (
-                  <MonitorUp className="h-[18px] w-[18px]" />
+                  <MonitorUp className="h-4 w-4" />
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              sideOffset={8}
-              className="hidden sm:block"
-            >
+            <TooltipContent side="top" sideOffset={8}>
               {isSharingScreen ? "Stop sharing" : "Share screen"}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* ══ INVITE / SHARE ═══════════════════════════ */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShareOpen(true)}
+                className={`${iconBtn} text-muted-foreground hover:text-foreground hover:bg-accent`}
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+              Invite
             </TooltipContent>
           </Tooltip>
 
@@ -389,17 +490,15 @@ export default function RoomMenuDock({
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="shrink-0 hidden sm:inline-flex">
+                <span>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="h-11 sm:h-10 px-1.5 flex items-center focus:outline-none touch-manipulation"
+                      className="h-9 px-1.5 flex items-center focus:outline-none touch-manipulation"
                       aria-label="Stream quality"
                     >
                       <Badge
                         variant="outline"
-                        className="text-[10px] font-mono px-1.5 h-[18px]
-                                   text-muted-foreground hover:text-foreground
-                                   cursor-pointer transition-colors"
+                        className="text-[10px] font-mono px-1.5 h-[18px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                       >
                         {currentBadge}
                       </Badge>
@@ -407,15 +506,10 @@ export default function RoomMenuDock({
                   </DropdownMenuTrigger>
                 </span>
               </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                sideOffset={8}
-                className="hidden sm:block"
-              >
+              <TooltipContent side="top" sideOffset={8}>
                 Stream quality
               </TooltipContent>
             </Tooltip>
-
             <DropdownMenuContent
               side="top"
               align="end"
@@ -428,7 +522,7 @@ export default function RoomMenuDock({
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup
                 value={quality}
-                onValueChange={(q) => setQuality(q as StreamQuality)}
+                onValueChange={(q) => handleQualityChange(q as ScreenQuality)}
               >
                 {QUALITY_OPTIONS.map((opt) => (
                   <DropdownMenuRadioItem
@@ -457,16 +551,12 @@ export default function RoomMenuDock({
                 size="icon"
                 variant="destructive"
                 onClick={handleLeave}
-                className={`${iconBtn} shrink-0`}
+                className={iconBtn}
               >
-                <PhoneOff className="h-[18px] w-[18px]" />
+                <PhoneOff className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              sideOffset={8}
-              className="hidden sm:block"
-            >
+            <TooltipContent side="top" sideOffset={8}>
               Leave room
             </TooltipContent>
           </Tooltip>

@@ -4,6 +4,21 @@ import { useUserStore } from "@/store/userStore";
 import * as mediasoup from "mediasoup-client";
 import { useRef } from "react";
 
+type ScreenQuality = "480p" | "720p30" | "720p60" | "1080p30" | "1080p60";
+
+const SCREEN_PRESETS: Record<
+  ScreenQuality,
+  { width: number; height: number; frameRate: number }
+> = {
+  "480p": { width: 854, height: 480, frameRate: 30 },
+
+  "720p30": { width: 1280, height: 720, frameRate: 30 },
+  "720p60": { width: 1280, height: 720, frameRate: 60 },
+
+  "1080p30": { width: 1920, height: 1080, frameRate: 30 },
+  "1080p60": { width: 1920, height: 1080, frameRate: 60 },
+};
+
 export default function useMediasoup() {
   const roomId = useRoomStore((s) => s.roomId);
   const userId = useUserStore((s) => s.user?.userId);
@@ -209,11 +224,17 @@ export default function useMediasoup() {
     }
   }
 
-  async function startScreenShare() {
+  async function startScreenShare(quality: ScreenQuality = "720p60") {
     if (!sendTransportRef.current) return;
 
+    const preset = SCREEN_PRESETS[quality];
+
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
+      video: {
+        width: { ideal: preset.width },
+        height: { ideal: preset.height },
+        frameRate: { ideal: preset.frameRate },
+      },
       audio: true,
     });
 
@@ -267,6 +288,19 @@ export default function useMediasoup() {
     }
 
     screenProducerRef.current = null;
+  }
+
+  async function changeScreenShareQuality(quality: ScreenQuality) {
+    const track = screenProducerRef.current?.track;
+    if (!track) return;
+
+    const preset = SCREEN_PRESETS[quality];
+
+    await track.applyConstraints({
+      width: { ideal: preset.width },
+      height: { ideal: preset.height },
+      frameRate: { ideal: preset.frameRate },
+    });
   }
 
   function mute() {
@@ -342,5 +376,6 @@ export default function useMediasoup() {
     undeafen,
     startScreenShare,
     stopScreenShare,
+    changeScreenShareQuality,
   };
 }

@@ -1,10 +1,10 @@
 "use client";
 import Image from "next/image";
 import { useUserStore } from "@/store/userStore";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { socket } from "@/lib/socket";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogIn, Plus, ArrowRight } from "lucide-react";
+import { Loader2, LogIn, Plus, ArrowRight, Github } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomStore } from "@/store/roomStore";
 
@@ -16,13 +16,7 @@ export default function JoinRoomUI() {
   const [isJoining, setIsJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(t);
-  }, []);
 
   if (!user) return null;
 
@@ -37,9 +31,7 @@ export default function JoinRoomUI() {
         });
         return;
       }
-      toast.success("Room created!", {
-        description: `Room ID: ${response.roomId} — share it with others.`,
-      });
+
       setRoom(response.roomId, response.peers);
     });
   };
@@ -60,9 +52,7 @@ export default function JoinRoomUI() {
       (response: any) => {
         setIsJoining(false);
         if (response?.error) {
-          toast.error("Failed to join room", {
-            description: response.error,
-          });
+          toast.error("Failed to join room", { description: response.error });
           return;
         }
         toast.success("Joined successfully!", {
@@ -73,38 +63,35 @@ export default function JoinRoomUI() {
     );
   };
 
-  const reveal = (delay: string) =>
-    `transition-all duration-500 ease-out ${delay} ${
-      mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-    }`;
-
   return (
-    <div className="flex items-center justify-center min-h-screen p-6">
+    <div className="flex flex-col items-center justify-center min-h-screen p-6">
       <div className="w-full max-w-[340px] flex flex-col items-center gap-9">
-        {/* Avatar */}
-        <div
-          className={`${reveal("delay-[40ms]")} flex flex-col items-center gap-3`}
-        >
-          <div className="rounded-full animate-pulse ring-2 ring-primary/20">
-            <Image
-              src={user.avatarUrl}
-              alt="avatar"
-              width={72}
-              height={72}
-              className="rounded-full"
-            />
+        {/* ── App logo slot ── */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-30  flex items-center justify-center overflow-hidden">
+            <Image src="/logo.svg" alt="Adda" width={95} height={95} />
           </div>
+        </div>
+
+        {/* ── Avatar + status ── */}
+        <div className="flex flex-col items-center gap-3 -mt-2">
+          <Image
+            src={user.avatarUrl}
+            alt="avatar"
+            width={72}
+            height={72}
+            className="rounded-full ring-2 ring-border"
+          />
           <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-muted/40">
-            <span className="w-[7px] h-[7px] rounded-full bg-green-500 shrink-0 animate-pulse" />
             <span className="text-sm font-medium text-foreground tracking-tight">
               {user.username}
             </span>
           </div>
         </div>
 
-        {/* Heading */}
-        <div className={`${reveal("delay-[120ms]")} text-center -mt-2`}>
-          <h1 className="text-[1.6rem] font-semibold tracking-tight text-foreground leading-snug">
+        {/* ── Heading ── */}
+        <div className="text-center -mt-2">
+          <h1 className="text-[1.6rem] font-semibold  tracking-tight text-foreground leading-snug">
             Join or create a room
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -112,8 +99,8 @@ export default function JoinRoomUI() {
           </p>
         </div>
 
-        {/* Room ID Input */}
-        <div className={`${reveal("delay-[200ms]")} w-full pb-6`}>
+        {/* ── Room ID input ── */}
+        <div className="w-full pb-6">
           <div className="relative w-full">
             <input
               ref={inputRef}
@@ -130,19 +117,18 @@ export default function JoinRoomUI() {
               autoComplete="off"
               spellCheck={false}
               className="w-full bg-transparent border-none outline-none
-                                       font-mono text-[1.9rem] font-medium tracking-[0.22em]
-                                       text-center uppercase text-foreground
-                                       caret-primary pb-3 pt-1
-                                       placeholder:text-muted-foreground/35
-                                       placeholder:text-base placeholder:tracking-normal
-                                       placeholder:normal-case placeholder:font-sans"
+                         font-mono text-[1.9rem] font-medium tracking-[0.22em]
+                         text-center uppercase text-foreground
+                         caret-primary pb-3 pt-1
+                         placeholder:text-muted-foreground/35
+                         placeholder:text-base placeholder:tracking-normal
+                         placeholder:normal-case placeholder:font-sans"
             />
-            {/* Animated underline */}
             <div className="absolute bottom-0 left-0 right-0 h-px bg-border" />
             <div
               className={`absolute bottom-0 left-0 right-0 h-0.5 bg-foreground
-                                        transition-transform duration-[400ms] ease-out origin-center
-                                        ${focused ? "scale-x-100" : "scale-x-0"}`}
+                          transition-transform duration-[400ms] ease-out origin-center
+                          ${focused ? "scale-x-100" : "scale-x-0"}`}
             />
             {roomIdInput.length > 0 && (
               <span className="absolute right-0 -bottom-5 font-mono text-[0.65rem] text-muted-foreground/40 tracking-wide">
@@ -152,15 +138,12 @@ export default function JoinRoomUI() {
           </div>
         </div>
 
-        {/* Buttons */}
-        <div
-          className={`${reveal("delay-[280ms]")} w-full flex flex-col gap-3 -mt-2`}
-        >
+        {/* ── Buttons ── */}
+        <div className="w-full flex flex-col gap-3 -mt-2">
           <Button
             onClick={handleJoinRoom}
             disabled={isJoining || isCreating}
-            className="w-full h-11 gap-2 text-sm font-medium
-                                   "
+            className="w-full h-11 gap-2 text-sm font-medium"
           >
             {isJoining ? (
               <>
@@ -188,8 +171,7 @@ export default function JoinRoomUI() {
             variant="outline"
             onClick={handleCreateRoom}
             disabled={isJoining || isCreating}
-            className="w-full h-11 gap-2 text-sm font-medium
-                                   "
+            className="w-full h-11 gap-2 text-sm font-medium"
           >
             {isCreating ? (
               <>
@@ -205,12 +187,28 @@ export default function JoinRoomUI() {
           </Button>
         </div>
 
-        {/* Footer */}
-        <p
-          className={`${reveal("delay-[360ms]")} text-[0.68rem] text-muted-foreground/40 text-center -mt-3`}
-        >
-          Connected via WebSocket · End-to-end
-        </p>
+        {/* ── Footer ── */}
+        <div className="flex items-center gap-4 pt-1">
+          <a
+            href="https://github.com/dipan-ck/adda"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Github className="w-3.5 h-3.5" />
+            GitHub
+          </a>
+          <span className="w-px h-3 bg-border" />
+          {/* TODO: update href to your portfolio URL when ready */}
+          <a
+            href="https://dipanck.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-muted-foreground font-sans hover:text-primary transition-colors"
+          >
+            by Dipan Chakrabort
+          </a>
+        </div>
       </div>
     </div>
   );

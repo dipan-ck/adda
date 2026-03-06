@@ -3,14 +3,12 @@ import { useRoomStore } from "@/store/roomStore";
 import RoomPeerCard from "./RoomPeerCard";
 import RoomMenuDock from "./RoomMenuDock";
 import { useState } from "react";
-import { Copy, Check, Mic } from "lucide-react";
+import { Mic } from "lucide-react";
 import useMediasoup from "@/hooks/useMediasoup";
 import { Button } from "@/components/ui/button";
 
 export default function RoomUI() {
   const peers = useRoomStore((s) => s.peers);
-  const roomId = useRoomStore((s) => s.roomId);
-  const [copied, setCopied] = useState(false);
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,15 +22,11 @@ export default function RoomUI() {
     undeafen,
     startScreenShare,
     stopScreenShare,
+    changeScreenShareQuality,
   } = useMediasoup();
 
   const n = peers.length;
 
-  // Responsive column logic:
-  //   mobile  (<640px)  → always 1 col
-  //   tablet  (640-1024) → 1 if solo, else 2
-  //   desktop (>1024)   → 1 / 2 / 3 / 4 based on count
-  // We encode this as a CSS grid with responsive classes instead of inline style.
   function gridCols() {
     if (n <= 1) return "grid-cols-1";
     if (n <= 4) return "grid-cols-1 sm:grid-cols-2";
@@ -63,19 +57,11 @@ export default function RoomUI() {
     }
   }
 
-  const handleCopy = () => {
-    if (!roomId) return;
-    navigator.clipboard.writeText(roomId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   // ── Gate / join screen ────────────────────────────────────────────────────
   if (!joined) {
     return (
       <div
         className="w-screen flex flex-col items-center justify-center bg-background px-4"
-        // dvh accounts for mobile browser chrome (address bar)
         style={{ minHeight: "100dvh" }}
       >
         <div className="w-full max-w-sm flex flex-col items-center gap-5 p-6 sm:p-8 rounded-2xl border border-border bg-card shadow-sm">
@@ -109,35 +95,9 @@ export default function RoomUI() {
       className="w-screen flex flex-col bg-background relative overflow-hidden"
       style={{ height: "100dvh" }}
     >
-      {/* ── Top room-ID bar ── */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                     bg-card/80 backdrop-blur-sm border border-border
-                     hover:bg-card active:scale-95 transition-all group"
-        >
-          <span className="text-[0.6rem] text-muted-foreground uppercase tracking-widest font-medium hidden xs:inline">
-            Room
-          </span>
-          <span className="font-mono text-xs font-semibold text-foreground tracking-wider">
-            {roomId}
-          </span>
-          {copied ? (
-            <Check className="w-3 h-3 text-green-500 shrink-0" />
-          ) : (
-            <Copy className="w-3 h-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          )}
-        </button>
-      </div>
-
-      {/* ── Peer grid area ──
-          pt-12 clears the top pill
-          pb accommodates the dock height + safe-area on iOS
-      ── */}
+      {/* ── Peer grid area ── */}
       <div
-        className="flex-1 p-3 pt-12 overflow-y-auto overflow-x-hidden"
-        // safe-area-inset-bottom handles iPhone notch / home bar
+        className="flex-1 p-3 pt-4 overflow-y-auto overflow-x-hidden"
         style={{
           paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))",
         }}
@@ -149,7 +109,6 @@ export default function RoomUI() {
             </p>
           </div>
         ) : n === 1 ? (
-          /* Single peer — centered, max width so it doesn't stretch on wide screens */
           <div className="w-full h-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
               <RoomPeerCard peer={peers[0]} />
@@ -173,6 +132,7 @@ export default function RoomUI() {
         undeafen={undeafen}
         startScreenShare={startScreenShare}
         stopScreenShare={stopScreenShare}
+        changeScreenShareQuality={changeScreenShareQuality}
       />
     </div>
   );

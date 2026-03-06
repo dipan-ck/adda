@@ -10,9 +10,8 @@ export function initSocket(server: HTTPServer) {
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        // Allow requests with no origin (server-to-server, curl)
         if (!origin) return callback(null, true);
-        // Dynamically allow devtunnels, localhost, and any explicitly listed origins
+
         if (
           origin.includes("devtunnels.ms") ||
           origin.includes("localhost") ||
