@@ -1,14 +1,14 @@
 services:
-    server:
-        container_name: adda-server
-        build:
-            context: .
-        ports:
-            - "8008:8008"
-            - "42000-42100:42000-42100/udp"
-            - "42000-42100:42000-42100/tcp"
-        env_file:
-            - .env
-        restart: unless-stopped
+  server:
+    container_name: adda-server
+    build:
+      context: .
+    ports:
+      - "8008:8008"
+      - "42000-42100:42000-42100/udp"
+      - "42000-42100:42000-42100/tcp"
+    env_file:
+      - .env
+    restart: unless-stopped
 
 # docker compose up --build
