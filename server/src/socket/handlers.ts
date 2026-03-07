@@ -236,7 +236,10 @@ export async function register_socket_handlers(io: Server) {
       try {
         if (spatialLayer === undefined) {
           // Auto — unset preferred layers, let BWE decide
-          await consumer.unsetPreferredLayers();
+          await consumer.setPreferredLayers({
+            spatialLayer: 2,
+            temporalLayer: 2,
+          });
         } else {
           await consumer.setPreferredLayers({
             spatialLayer,
