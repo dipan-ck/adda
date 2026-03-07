@@ -28,6 +28,11 @@ export default function RoomUI() {
     stopScreenShare,
     setScreenMaxQuality,
     setViewerQuality,
+    setMicVolume,
+    setSpeakerVolume,
+    toggleNoiseSuppression,
+    startCamera,
+    stopCamera,
   } = useMediasoup();
 
   const n = peers.length;
@@ -82,11 +87,7 @@ export default function RoomUI() {
           {error && (
             <p className="text-xs text-destructive text-center">{error}</p>
           )}
-          <Button
-            onClick={handleJoin}
-            disabled={joining}
-            className="w-full rounded-full"
-          >
+          <Button onClick={handleJoin} disabled={joining} className="w-full ">
             {joining ? "Joining…" : "Join with Mic"}
           </Button>
         </div>
@@ -146,6 +147,11 @@ export default function RoomUI() {
         stopScreenShare={stopScreenShare}
         setScreenMaxQuality={setScreenMaxQuality}
         onShareRoom={() => setShareOpen(true)}
+        setMicVolume={setMicVolume}
+        setSpeakerVolume={setSpeakerVolume}
+        toggleNoiseSuppression={toggleNoiseSuppression}
+        startCamera={startCamera}
+        stopCamera={stopCamera}
       />
 
       {/* ── Share Modal ── */}

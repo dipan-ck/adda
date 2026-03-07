@@ -8,6 +8,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { Peer, useRoomStore } from "@/store/roomStore";
 import Image from "next/image";
 import { Settings2, Maximize2, Minimize2 } from "lucide-react";
@@ -70,7 +71,7 @@ export default function RoomPeerCard({
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-video rounded-xl border border-border bg-card overflow-hidden group"
+      className="relative w-full aspect-video rounded-lg border border-border bg-black overflow-hidden group shadow-sm"
       // In fullscreen the browser gives the element full viewport — these styles handle that
       style={
         isFullscreen
@@ -87,48 +88,52 @@ export default function RoomPeerCard({
           ref={(el) => {
             if (el) el.srcObject = streamData.stream;
           }}
-          className="absolute inset-0 w-full h-full object-contain bg-black"
+          className="absolute inset-0 w-full h-full object-contain"
         />
       )}
 
       {/* AVATAR FALLBACK */}
       {!hasStream && (
-        <div className="flex flex-col items-center justify-center h-full gap-2 py-6">
+        <div className="flex flex-col items-center justify-center h-full gap-3 py-6 bg-muted">
           <Image
             src={peer.avatarUrl}
             alt={peer.username}
-            width={56}
-            height={56}
+            width={64}
+            height={64}
             className="rounded-full ring-2 ring-border"
           />
-          <span className="text-xs text-muted-foreground font-medium">
+          <span className="text-sm text-muted-foreground font-medium">
             {peer.username}
           </span>
         </div>
       )}
 
-      {/* Overlay controls — visible on hover or in fullscreen */}
+      {/* Overlay controls — always visible */}
       {hasStream && streamData && (
         <>
           {/* Name badge */}
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/50 backdrop-blur-sm">
+          <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-md bg-black/70 backdrop-blur-sm border border-white/10">
             <span className="text-xs text-white font-medium">
               {peer.username}
             </span>
           </div>
 
-          {/* Top-right controls */}
-          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          {/* Top-right controls — always visible */}
+          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-100 transition-opacity duration-150">
             {/* Viewer quality */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 text-[10px] px-2 py-1 bg-black/60 backdrop-blur-sm border border-white/10 rounded-md text-white hover:bg-black/80 transition-colors">
-                  <Settings2 className="w-3 h-3" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs bg-black/70 backdrop-blur-sm border border-white/10 text-white hover:bg-black/80 hover:text-white rounded-md"
+                >
+                  <Settings2 className="w-3.5 h-3.5 mr-1" />
                   <span>{qualityLabel}</span>
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground">
                   Viewer Quality
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -158,17 +163,19 @@ export default function RoomPeerCard({
             </DropdownMenu>
 
             {/* Fullscreen toggle */}
-            <button
+            <Button
               onClick={toggleFullscreen}
-              className="flex items-center justify-center w-7 h-7 bg-black/60 backdrop-blur-sm border border-white/10 rounded-md text-white hover:bg-black/80 transition-colors"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 bg-black/70 backdrop-blur-sm border border-white/10 text-white hover:bg-black/80 hover:text-white rounded-md"
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
               {isFullscreen ? (
-                <Minimize2 className="w-3.5 h-3.5" />
+                <Minimize2 className="w-4 h-4" />
               ) : (
-                <Maximize2 className="w-3.5 h-3.5" />
+                <Maximize2 className="w-4 h-4" />
               )}
-            </button>
+            </Button>
           </div>
         </>
       )}

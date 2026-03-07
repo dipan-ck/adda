@@ -10,10 +10,13 @@ import {
   PhoneOff,
   Share2,
   ChevronUp,
+  Camera,
+  CameraOff,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 
 import {
   Tooltip,
@@ -32,6 +35,12 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
 import { socket } from "@/lib/socket";
 import { useRoomStore } from "@/store/roomStore";
 import { useState } from "react";
@@ -46,6 +55,11 @@ export default function RoomMenuDock({
   stopScreenShare,
   setScreenMaxQuality,
   onShareRoom,
+  setMicVolume,
+  setSpeakerVolume,
+  toggleNoiseSuppression,
+  startCamera,
+  stopCamera,
 }: {
   mute: () => void;
   unmute: () => void;
@@ -56,15 +70,24 @@ export default function RoomMenuDock({
   stopScreenShare: () => void;
   setScreenMaxQuality: (layer: 0 | 1 | 2) => void;
   onShareRoom: () => void;
+  setMicVolume: (percent: number) => void;
+  setSpeakerVolume: (percent: number) => void;
+  toggleNoiseSuppression: (enabled: boolean) => void;
+  startCamera: () => void;
+  stopCamera: () => void;
 }) {
   const leaveRoom = useRoomStore((s) => s.leaveRoom);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(false);
   const [streamQuality, setStreamQuality] = useState<string>("2");
+  const [micVolume, setMicVolumeState] = useState(100);
+  const [speakerVolume, setSpeakerVolumeState] = useState(100);
 
-  const iconBtn = "rounded-xl h-9 w-9 transition-all duration-150";
+  const iconBtn =
+    "rounded-xl h-9 w-9 transition-all duration-150 flex-shrink-0";
 
   const toggleMute = () => {
     if (isMuted) {
@@ -95,8 +118,18 @@ export default function RoomMenuDock({
         await startScreenShare();
         setIsSharingScreen(true);
       } catch {
-        // user cancelled or permission denied — don't flip state
+        /* cancelled */
       }
+    }
+  };
+
+  const toggleCamera = () => {
+    if (isCameraOn) {
+      stopCamera();
+      setIsCameraOn(false);
+    } else {
+      startCamera();
+      setIsCameraOn(true);
     }
   };
 
@@ -116,7 +149,7 @@ export default function RoomMenuDock({
     <TooltipProvider delayDuration={0}>
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
         <div className="flex items-center gap-0.5 px-1.5 py-1.5 bg-popover/95 backdrop-blur border border-border rounded-2xl shadow-xl shadow-black/10">
-          {/* ── MIC ── */}
+          {/* ── MIC button + chevron to open volume ── */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -135,7 +168,45 @@ export default function RoomMenuDock({
             <TooltipContent>{isMuted ? "Unmute" : "Mute"}</TooltipContent>
           </Tooltip>
 
-          {/* ── SPEAKER ── */}
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center justify-center w-4 h-9 rounded-md hover:bg-accent transition-colors"
+                    aria-label="Mic volume"
+                  >
+                    <ChevronUp size={10} className="text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Input volume</TooltipContent>
+            </Tooltip>
+            <PopoverContent side="top" align="center" className="w-48 p-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Mic size={12} /> Input volume
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums">
+                    {micVolume}%
+                  </span>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[micVolume]}
+                  onValueChange={([v]) => {
+                    setMicVolumeState(v);
+                    setMicVolume(v);
+                  }}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* ── SPEAKER button + chevron to open volume ── */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -156,10 +227,68 @@ export default function RoomMenuDock({
             </TooltipContent>
           </Tooltip>
 
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center justify-center w-4 h-9 rounded-md hover:bg-accent transition-colors"
+                    aria-label="Speaker volume"
+                  >
+                    <ChevronUp size={10} className="text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Output volume</TooltipContent>
+            </Tooltip>
+            <PopoverContent side="top" align="center" className="w-48 p-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Volume2 size={12} /> Output volume
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums">
+                    {speakerVolume}%
+                  </span>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[speakerVolume]}
+                  onValueChange={([v]) => {
+                    setSpeakerVolumeState(v);
+                    setSpeakerVolume(v);
+                  }}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* ── DIVIDER ── */}
           <div className="w-px h-5 bg-border mx-0.5" />
 
-          {/* ── SCREEN SHARE + QUALITY (grouped) ── */}
+          {/* ── CAMERA ── */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isCameraOn ? "secondary" : "ghost"}
+                size="icon"
+                onClick={toggleCamera}
+                className={`${iconBtn} ${isCameraOn ? "text-primary" : ""}`}
+              >
+                {isCameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isCameraOn ? "Stop camera" : "Start camera"}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* ── DIVIDER ── */}
+          <div className="w-px h-5 bg-border mx-0.5" />
+
+          {/* ── SCREEN SHARE + QUALITY ── */}
           <div className="flex items-center">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -181,7 +310,6 @@ export default function RoomMenuDock({
               </TooltipContent>
             </Tooltip>
 
-            {/* Stream quality — only visible when you are the streamer */}
             {isSharingScreen && (
               <DropdownMenu>
                 <Tooltip>
@@ -203,7 +331,6 @@ export default function RoomMenuDock({
                   </TooltipTrigger>
                   <TooltipContent>Stream quality</TooltipContent>
                 </Tooltip>
-
                 <DropdownMenuContent side="top" align="end" className="w-44">
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
                     Your stream quality
