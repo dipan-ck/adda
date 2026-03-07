@@ -4,27 +4,11 @@ import { useUserStore } from "@/store/userStore";
 import * as mediasoup from "mediasoup-client";
 import { useRef } from "react";
 
-type ScreenQuality = "480p" | "720p30" | "720p60" | "1080p30" | "1080p60";
-
-const SCREEN_PRESETS: Record<
-  ScreenQuality,
-  { width: number; height: number; frameRate: number }
-> = {
-  "480p": { width: 854, height: 480, frameRate: 30 },
-
-  "720p30": { width: 1280, height: 720, frameRate: 30 },
-  "720p60": { width: 1280, height: 720, frameRate: 60 },
-
-  "1080p30": { width: 1920, height: 1080, frameRate: 30 },
-  "1080p60": { width: 1920, height: 1080, frameRate: 60 },
-};
-
 export default function useMediasoup() {
   const roomId = useRoomStore((s) => s.roomId);
   const userId = useUserStore((s) => s.user?.userId);
   const addVideoStream = useRoomStore((s) => s.addVideoStream);
   const removeVideoStream = useRoomStore((s) => s.removeVideoStream);
-
   const clearVideoStreams = useRoomStore((s) => s.clearVideoStreams);
 
   const deviceRef = useRef<mediasoup.types.Device | null>(null);
@@ -35,16 +19,11 @@ export default function useMediasoup() {
   const cameraProducerRef = useRef<mediasoup.types.Producer | null>(null);
   const screenProducerRef = useRef<mediasoup.types.Producer | null>(null);
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const micGainNodeRef = useRef<GainNode | null>(null);
-  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-
   const screenVideoTrackRef = useRef<MediaStreamTrack | null>(null);
-
   const screenProducerIdRef = useRef<string | null>(null);
 
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
-  const consumersRef = useRef<Map<string, mediasoup.types.Consumer>>(new Map()); // key = producerId
+  const consumersRef = useRef<Map<string, mediasoup.types.Consumer>>(new Map());
 
   async function get_router_capabilities() {
     const data = await new Promise((res, rej) => {
@@ -131,34 +110,19 @@ export default function useMediasoup() {
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        noiseSuppression: true,
+        noiseSuppression: { exact: false },
         echoCancellation: true,
       },
     });
 
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
-    const gain = ctx.createGain();
-
-    gain.gain.value = 1;
-
-    source.connect(gain);
-
-    const destination = ctx.createMediaStreamDestination();
-    gain.connect(destination);
-
-    const processedTrack = destination.stream.getAudioTracks()[0];
+    const track = stream.getAudioTracks()[0];
 
     const producer = await sendTransportRef.current.produce({
-      track: processedTrack,
+      track,
       disableTrackOnPause: true,
       zeroRtpOnPause: true,
-      appData: { type: "audio" },
+      appData: { type: "audio", userId },
     });
-
-    audioContextRef.current = ctx;
-    micGainNodeRef.current = gain;
-    micSourceRef.current = source;
 
     audioProducerRef.current = producer;
   }
@@ -275,7 +239,6 @@ export default function useMediasoup() {
     const producer = await sendTransportRef.current.produce({
       track: videoTrack,
       appData: { type: "screen", userId },
-
       encodings: [
         { rid: "r0", maxBitrate: 400000, scaleResolutionDownBy: 4 },
         { rid: "r1", maxBitrate: 1500000, scaleResolutionDownBy: 2 },
@@ -307,13 +270,11 @@ export default function useMediasoup() {
     const producer = screenProducerRef.current;
     if (!producer) return;
 
-    // Stop the actual media track so the browser indicator disappears
     producer.track?.stop();
 
     socket.emit("close-producer", { roomId, producerId: producer.id });
     producer.close();
 
-    // ── FIX 1b: remove our own local stream from the store ────────────────
     if (screenProducerIdRef.current) {
       removeVideoStream(screenProducerIdRef.current);
       screenProducerIdRef.current = null;
@@ -338,7 +299,6 @@ export default function useMediasoup() {
 
     const q = qualityMap[spatialLayer];
 
-    // Check encodings instead of producer.type
     const isSimulcast =
       producer.rtpParameters.encodings &&
       producer.rtpParameters.encodings.length > 1;
@@ -357,21 +317,15 @@ export default function useMediasoup() {
       producerId: screenProducerIdRef.current,
       maxSpatialLayer: spatialLayer,
     });
-
-    console.log(
-      `Quality set to layer ${spatialLayer}, isSimulcast: ${isSimulcast}, encodings: ${producer.rtpParameters.encodings?.length}`,
-    );
   }
 
-  // Already in your useMediasoup.ts — no changes needed
   async function setViewerQuality(producerId: string, layer?: 0 | 1 | 2) {
     const consumer = consumersRef.current.get(producerId);
-
     if (!consumer) return;
 
     socket.emit("set-consumer-layers", {
       consumerId: consumer.id,
-      spatialLayer: layer, // undefined = let mediasoup BWE auto-select
+      spatialLayer: layer,
     });
   }
 
@@ -401,7 +355,6 @@ export default function useMediasoup() {
     socket.off("consumer-resumed");
     socket.off("producer-closed");
 
-    // Stop and close our own audio producer
     const producer = audioProducerRef.current;
     if (producer) {
       producer.track?.stop();
@@ -409,7 +362,6 @@ export default function useMediasoup() {
       audioProducerRef.current = null;
     }
 
-    // Stop and close screen share producer if still active
     const screenProducer = screenProducerRef.current;
     if (screenProducer) {
       screenProducer.track?.stop();
@@ -421,35 +373,22 @@ export default function useMediasoup() {
     consumersRef.current.forEach((consumer) => consumer.close());
     consumersRef.current.clear();
 
-    // Silence all remote audio elements
     audioElementsRef.current.forEach((audio) => {
       audio.pause();
       audio.srcObject = null;
     });
     audioElementsRef.current.clear();
 
-    // Close transports
     sendTransportRef.current?.close();
     recvTransportRef.current?.close();
     sendTransportRef.current = null;
     recvTransportRef.current = null;
 
-    // ── FIX 2: wipe all video streams so rejoin starts with a clean slate ──
     clearVideoStreams();
-  }
-
-  function setMicVolume(percent: number) {
-    const gain = micGainNodeRef.current;
-    if (!gain) return;
-
-    const value = Math.min(Math.max(percent, 0), 100) / 100;
-
-    gain.gain.value = value;
   }
 
   function setSpeakerVolume(percent: number) {
     const volume = Math.min(Math.max(percent, 0), 100) / 100;
-
     audioElementsRef.current.forEach((audio) => {
       audio.volume = volume;
     });
@@ -459,16 +398,34 @@ export default function useMediasoup() {
     const producer = audioProducerRef.current;
     if (!producer) return;
 
-    const track = producer.track;
-
-    if (!track) return;
-
     try {
-      await track.applyConstraints({
-        noiseSuppression: enabled,
-      });
+      // Use `exact` so Chrome is forced to honour the constraint rather than
+      // treating it as an ignored hint. Fall back to ideal if device rejects exact.
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            noiseSuppression: { exact: enabled },
+            echoCancellation: true,
+          },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { noiseSuppression: enabled, echoCancellation: true },
+        });
+      }
+
+      const newTrack = stream.getAudioTracks()[0];
+
+      // Save the OLD track BEFORE replaceTrack updates producer.track
+      const oldTrack = producer.track;
+
+      await producer.replaceTrack({ track: newTrack });
+
+      // Stop the old track so the mic indicator clears
+      oldTrack?.stop();
     } catch (err) {
-      console.warn("Noise suppression change failed", err);
+      console.warn("Noise suppression toggle failed", err);
     }
   }
 
@@ -491,16 +448,11 @@ export default function useMediasoup() {
 
     const producer = await sendTransportRef.current.produce({
       track: videoTrack,
-      appData: {
-        type: "camera",
-        userId,
-      },
-
+      appData: { type: "camera", userId },
       encodings: [
         { rid: "r0", maxBitrate: 300000, scaleResolutionDownBy: 2 },
         { rid: "r1", maxBitrate: 1500000, scaleResolutionDownBy: 1 },
       ],
-
       codecOptions: {
         videoGoogleStartBitrate: 1000,
       },
@@ -528,9 +480,7 @@ export default function useMediasoup() {
     });
 
     producer.close();
-
     removeVideoStream(producer.id);
-
     cameraProducerRef.current = null;
   }
 
@@ -545,7 +495,6 @@ export default function useMediasoup() {
     stopScreenShare,
     setScreenMaxQuality,
     setViewerQuality,
-    setMicVolume,
     setSpeakerVolume,
     toggleNoiseSuppression,
     startCamera,

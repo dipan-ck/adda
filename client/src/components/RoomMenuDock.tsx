@@ -12,11 +12,14 @@ import {
   ChevronUp,
   Camera,
   CameraOff,
+  Wind,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 import {
   Tooltip,
@@ -55,7 +58,6 @@ export default function RoomMenuDock({
   stopScreenShare,
   setScreenMaxQuality,
   onShareRoom,
-  setMicVolume,
   setSpeakerVolume,
   toggleNoiseSuppression,
   startCamera,
@@ -70,7 +72,6 @@ export default function RoomMenuDock({
   stopScreenShare: () => void;
   setScreenMaxQuality: (layer: 0 | 1 | 2) => void;
   onShareRoom: () => void;
-  setMicVolume: (percent: number) => void;
   setSpeakerVolume: (percent: number) => void;
   toggleNoiseSuppression: (enabled: boolean) => void;
   startCamera: () => void;
@@ -83,8 +84,8 @@ export default function RoomMenuDock({
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [streamQuality, setStreamQuality] = useState<string>("2");
-  const [micVolume, setMicVolumeState] = useState(100);
   const [speakerVolume, setSpeakerVolumeState] = useState(100);
+  const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(false);
 
   const iconBtn =
     "rounded-xl h-9 w-9 transition-all duration-150 flex-shrink-0";
@@ -133,6 +134,11 @@ export default function RoomMenuDock({
     }
   };
 
+  const handleNoiseSuppressionToggle = (enabled: boolean) => {
+    setNoiseSuppressionEnabled(enabled);
+    toggleNoiseSuppression(enabled);
+  };
+
   const leave = () => {
     socket.disconnect();
     cleanup();
@@ -149,7 +155,7 @@ export default function RoomMenuDock({
     <TooltipProvider delayDuration={0}>
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
         <div className="flex items-center gap-0.5 px-1.5 py-1.5 bg-popover/95 backdrop-blur border border-border rounded-2xl shadow-xl shadow-black/10">
-          {/* ── MIC button + chevron to open volume ── */}
+          {/* ── MIC button + chevron to open noise suppression ── */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -174,34 +180,31 @@ export default function RoomMenuDock({
                 <PopoverTrigger asChild>
                   <button
                     className="flex items-center justify-center w-4 h-9 rounded-md hover:bg-accent transition-colors"
-                    aria-label="Mic volume"
+                    aria-label="Mic settings"
                   >
                     <ChevronUp size={10} className="text-muted-foreground" />
                   </button>
                 </PopoverTrigger>
               </TooltipTrigger>
-              <TooltipContent>Input volume</TooltipContent>
+              <TooltipContent>Mic settings</TooltipContent>
             </Tooltip>
-            <PopoverContent side="top" align="center" className="w-48 p-3">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <Mic size={12} /> Input volume
-                  </span>
-                  <span className="text-xs font-semibold tabular-nums">
-                    {micVolume}%
-                  </span>
+            <PopoverContent side="top" align="center" className="w-52 p-3">
+              <div className="flex flex-col gap-4">
+                {/* Noise suppression toggle */}
+                <div className="flex items-center justify-between gap-2">
+                  <Label
+                    htmlFor="noise-suppression"
+                    className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Wind size={12} />
+                    Noise suppression
+                  </Label>
+                  <Switch
+                    id="noise-suppression"
+                    checked={noiseSuppressionEnabled}
+                    onCheckedChange={handleNoiseSuppressionToggle}
+                  />
                 </div>
-                <Slider
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={[micVolume]}
-                  onValueChange={([v]) => {
-                    setMicVolumeState(v);
-                    setMicVolume(v);
-                  }}
-                />
               </div>
             </PopoverContent>
           </Popover>
