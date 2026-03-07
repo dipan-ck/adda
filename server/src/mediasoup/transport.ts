@@ -15,9 +15,11 @@ export async function create_mediasoup_WebRtcTransport(
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
-    initialAvailableOutgoingBitrate: 10_000_000,
-    maxSctpMessageSize: 262144,
+    initialAvailableOutgoingBitrate: 25_000_000,
   });
+
+  await transport.setMaxOutgoingBitrate(40_000_000);
+  await transport.setMaxIncomingBitrate(40_000_000);
 
   return {
     transport,

@@ -1,291 +1,177 @@
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Peer, useRoomStore } from "@/store/roomStore";
 import Image from "next/image";
-import { Maximize2, Minimize2 } from "lucide-react";
-import { Peer, VideoStream } from "@/store/roomStore";
-import { useRoomStore } from "@/store/roomStore";
-import { Badge } from "@/components/ui/badge";
+import { Settings2, Maximize2, Minimize2 } from "lucide-react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
-function isTouchDevice() {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(hover: none)").matches;
-}
-
-function FullscreenOverlay({
+export default function RoomPeerCard({
   peer,
-  streamData,
-  onClose,
+  setViewerQuality,
 }: {
   peer: Peer;
-  streamData: VideoStream | undefined;
-  onClose: () => void;
+  setViewerQuality: (producerId: string, layer?: 0 | 1 | 2) => Promise<void>;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  // true = native fullscreen succeeded; false = CSS fallback
-  const [nativeFs, setNativeFs] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  // ── Try native fullscreen, fall back to CSS overlay ───────────────────────
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    async function enter() {
-      try {
-        if (el!.requestFullscreen) {
-          await el!.requestFullscreen();
-          setNativeFs(true);
-        } else if ((el as any).webkitRequestFullscreen) {
-          await (el as any).webkitRequestFullscreen();
-          setNativeFs(true);
-        } else {
-          // iOS Safari — no native fullscreen for arbitrary elements
-          setNativeFs(false);
-        }
-      } catch {
-        setNativeFs(false);
-      }
-      // Animate in regardless of mode
-      requestAnimationFrame(() => setVisible(true));
-    }
-
-    enter();
-
-    // Native fullscreen exit via Escape or browser button
-    function onFsChange() {
-      const fsEl =
-        document.fullscreenElement || (document as any).webkitFullscreenElement;
-      if (!fsEl) onClose();
-    }
-
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-    };
-  }, [onClose]);
-
-  // ── Keep video srcObject in sync ──────────────────────────────────────────
-  useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.srcObject = streamData?.stream ?? null;
-  }, [streamData?.stream]);
-
-  // ── Exit ──────────────────────────────────────────────────────────────────
-  async function handleMinimize() {
-    setVisible(false);
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else if ((document as any).webkitFullscreenElement)
-        await (document as any).webkitExitFullscreen();
-    } catch {
-      /* already exited */
-    }
-    setTimeout(onClose, 220);
-  }
-
-  // When native fullscreen is active the browser controls sizing;
-  // when falling back we use fixed + 100dvh to fill the visual viewport.
-  const fallbackStyle = !nativeFs
-    ? {
-        position: "fixed" as const,
-        inset: 0,
-        zIndex: 9999,
-        width: "100%",
-        height: "100dvh",
-      }
-    : { width: "100vw", height: "100vh" };
-
-  return (
-    <div
-      ref={containerRef}
-      className="bg-black flex items-center justify-center"
-      style={{
-        ...fallbackStyle,
-        transition: "opacity 220ms ease",
-        opacity: visible ? 1 : 0,
-      }}
-    >
-      {streamData ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-contain"
-        />
-      ) : (
-        <div className="flex flex-col items-center gap-4 text-center px-6">
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24">
-            <Image
-              src={peer.avatarUrl}
-              alt={peer.username}
-              fill
-              className="rounded-full ring-2 ring-white/20 object-cover"
-            />
-          </div>
-          <p className="text-white/80 text-base font-medium">{peer.username}</p>
-          <p className="text-white/40 text-sm">No active stream</p>
-        </div>
-      )}
-
-      {/* Minimize button — large tap target for mobile */}
-      <button
-        onClick={handleMinimize}
-        className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10
-                   p-2.5 sm:p-2 rounded-xl
-                   bg-white/10 backdrop-blur-sm border border-white/20
-                   text-white hover:bg-white/20 active:scale-95
-                   transition-all duration-150
-                   touch-manipulation"
-        aria-label="Exit fullscreen"
-      >
-        <Minimize2 className="w-5 h-5" />
-      </button>
-
-      {/* Bottom HUD */}
-      <div
-        className="absolute bottom-0 inset-x-0 h-20
-                    bg-gradient-to-t from-black/80 to-transparent
-                    flex items-end px-4 sm:px-5 pb-4 pointer-events-none"
-        // Safe area for iPhone home bar
-        style={{
-          paddingBottom: "max(1rem, env(safe-area-inset-bottom, 1rem))",
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {streamData?.type === "screen" && (
-            <Badge
-              variant="secondary"
-              className="text-[10px] uppercase tracking-widest"
-            >
-              Screen
-            </Badge>
-          )}
-          <span className="text-white/90 text-sm font-medium">
-            {peer.username}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Peer Card ────────────────────────────────────────────────────────────────
-
-export default function RoomPeerCard({ peer }: { peer: Peer }) {
   const videoStreams = useRoomStore((s) => s.videoStreams);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [focused, setFocused] = useState(false);
-  // On touch devices we always show the expand icon (no hover state available)
-  const [touch] = useState(() =>
-    typeof window !== "undefined" ? isTouchDevice() : false,
-  );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [qualityLabel, setQualityLabel] = useState("Auto");
 
   const streamData =
     videoStreams.find((s) => s.userId === peer.userId && s.type === "screen") ??
     videoStreams.find((s) => s.userId === peer.userId);
 
-  // Always sync srcObject — null clears dead streams so avatar shows
-  useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.srcObject = streamData?.stream ?? null;
-  }, [streamData]);
-
-  const handleClose = useCallback(() => setFocused(false), []);
   const hasStream = Boolean(streamData);
 
+  // Track fullscreen state changes (e.g. user presses Escape)
+  useEffect(() => {
+    const handler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      try {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } catch (err) {
+        console.error("Fullscreen request failed:", err);
+      }
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  const handleQuality = useCallback(
+    async (producerId: string, layer?: 0 | 1 | 2) => {
+      await setViewerQuality(producerId, layer);
+      if (layer === undefined) setQualityLabel("Auto");
+      else if (layer === 2) setQualityLabel("1080p");
+      else if (layer === 1) setQualityLabel("720p");
+      else setQualityLabel("360p");
+    },
+    [setViewerQuality],
+  );
+
   return (
-    <>
-      {/* ── Card ── */}
-      <div
-        onClick={() => setFocused(true)}
-        className="relative w-full rounded-xl border border-border bg-card overflow-hidden
-                   cursor-pointer select-none group
-                   transition-all duration-200 ease-out
-                   hover:shadow-lg active:scale-[0.98]
-                   touch-manipulation"
-        style={{ aspectRatio: "16/9" }}
-      >
-        {/* Video layer — always mounted so srcObject assignment sticks */}
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-video rounded-xl border border-border bg-card overflow-hidden group"
+      // In fullscreen the browser gives the element full viewport — these styles handle that
+      style={
+        isFullscreen
+          ? { width: "100vw", height: "100vh", borderRadius: 0, border: "none" }
+          : undefined
+      }
+    >
+      {/* VIDEO */}
+      {hasStream && streamData && (
         <video
-          ref={videoRef}
           autoPlay
           playsInline
           muted
-          className={`absolute inset-0 w-full h-full object-cover
-                      transition-opacity duration-300
-                      ${hasStream ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          ref={(el) => {
+            if (el) el.srcObject = streamData.stream;
+          }}
+          className="absolute inset-0 w-full h-full object-contain bg-black"
         />
+      )}
 
-        {/* Avatar fallback */}
-        <div
-          className={`absolute inset-0 flex flex-col items-center justify-center gap-2 sm:gap-3
-                      transition-opacity duration-300
-                      ${hasStream ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        >
-          <div className="relative w-12 h-12 sm:w-16 sm:h-16">
-            <Image
-              src={peer.avatarUrl}
-              alt={peer.username}
-              fill
-              className="rounded-full ring-2 ring-border object-cover"
-            />
-          </div>
-          <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+      {/* AVATAR FALLBACK */}
+      {!hasStream && (
+        <div className="flex flex-col items-center justify-center h-full gap-2 py-6">
+          <Image
+            src={peer.avatarUrl}
+            alt={peer.username}
+            width={56}
+            height={56}
+            className="rounded-full ring-2 ring-border"
+          />
+          <span className="text-xs text-muted-foreground font-medium">
             {peer.username}
           </span>
         </div>
-
-        {/* Screen share badge */}
-        {streamData?.type === "screen" && (
-          <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2">
-            <Badge
-              variant="secondary"
-              className="text-[9px] sm:text-[10px] uppercase tracking-widest px-1.5"
-            >
-              Screen
-            </Badge>
-          </div>
-        )}
-
-        {/* Username overlay — bottom left */}
-        <div className="absolute bottom-1.5 left-1.5 sm:bottom-2 sm:left-2">
-          <Badge
-            variant="outline"
-            className="text-[10px] sm:text-xs bg-background/50 backdrop-blur-sm border-border/60 px-1.5"
-          >
-            {peer.username}
-          </Badge>
-        </div>
-
-        {/* Expand icon:
-            - Desktop: fade in on hover
-            - Touch/mobile: always visible (no hover state) */}
-        <div
-          className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2
-                      p-1.5 rounded-md
-                      bg-background/50 backdrop-blur-sm border border-border/60
-                      transition-opacity duration-200
-                      ${
-                        touch
-                          ? "opacity-100"
-                          : "opacity-0 group-hover:opacity-100"
-                      }`}
-        >
-          <Maximize2 className="w-3 h-3 text-foreground" />
-        </div>
-      </div>
-
-      {focused && (
-        <FullscreenOverlay
-          peer={peer}
-          streamData={streamData}
-          onClose={handleClose}
-        />
       )}
-    </>
+
+      {/* Overlay controls — visible on hover or in fullscreen */}
+      {hasStream && streamData && (
+        <>
+          {/* Name badge */}
+          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/50 backdrop-blur-sm">
+            <span className="text-xs text-white font-medium">
+              {peer.username}
+            </span>
+          </div>
+
+          {/* Top-right controls */}
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            {/* Viewer quality */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 text-[10px] px-2 py-1 bg-black/60 backdrop-blur-sm border border-white/10 rounded-md text-white hover:bg-black/80 transition-colors">
+                  <Settings2 className="w-3 h-3" />
+                  <span>{qualityLabel}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Viewer Quality
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    handleQuality(streamData.producerId, undefined)
+                  }
+                >
+                  Auto
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleQuality(streamData.producerId, 2)}
+                >
+                  High (1080p)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleQuality(streamData.producerId, 1)}
+                >
+                  Medium (720p)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleQuality(streamData.producerId, 0)}
+                >
+                  Low (360p)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Fullscreen toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center justify-center w-7 h-7 bg-black/60 backdrop-blur-sm border border-white/10 rounded-md text-white hover:bg-black/80 transition-colors"
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

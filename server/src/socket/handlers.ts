@@ -116,6 +116,12 @@ export async function register_socket_handlers(io: Server) {
           appData,
         );
 
+        console.log(`Producer created: ${kind}, type: ${producer.type}`);
+        console.log(
+          "Encodings:",
+          JSON.stringify(producer.rtpParameters.encodings, null, 2),
+        );
+
         callback({ id: producer.id });
       },
     );
@@ -183,6 +189,7 @@ export async function register_socket_handlers(io: Server) {
           rtpCapabilities,
           socket,
         );
+
         callback({
           id: consumer.id,
           producerId,
@@ -191,6 +198,55 @@ export async function register_socket_handlers(io: Server) {
         });
       },
     );
+
+    socket.on(
+      "set-producer-max-layer",
+      async ({ roomId, producerId, maxSpatialLayer }) => {
+        const room = get_room(roomId);
+        if (!room) return;
+
+        for (const [, peer] of room.peers) {
+          for (const [, consumer] of peer.consumers) {
+            if (consumer.producerId !== producerId) continue;
+            if (consumer.kind !== "video") continue;
+            if (consumer.type !== "simulcast") continue;
+
+            try {
+              await consumer.setPreferredLayers({
+                spatialLayer: maxSpatialLayer,
+                temporalLayer: 2,
+              });
+            } catch (err) {
+              console.error(
+                "Layer switch failed for consumer",
+                consumer.id,
+                err,
+              );
+            }
+          }
+        }
+      },
+    );
+
+    socket.on("set-consumer-layers", async ({ consumerId, spatialLayer }) => {
+      const consumer = find_peer_consumer(consumerId, socket);
+      if (!consumer) return;
+      if (consumer.type !== "simulcast") return;
+
+      try {
+        if (spatialLayer === undefined) {
+          // Auto — unset preferred layers, let BWE decide
+          await consumer.unsetPreferredLayers();
+        } else {
+          await consumer.setPreferredLayers({
+            spatialLayer,
+            temporalLayer: 2,
+          });
+        }
+      } catch (err) {
+        console.error("Layer switch failed", err);
+      }
+    });
 
     socket.on(
       "resume-consumer",

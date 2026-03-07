@@ -2,6 +2,7 @@
 import { useRoomStore } from "@/store/roomStore";
 import RoomPeerCard from "./RoomPeerCard";
 import RoomMenuDock from "./RoomMenuDock";
+import ShareModal from "./ShareModal";
 import { useState } from "react";
 import { Mic } from "lucide-react";
 import useMediasoup from "@/hooks/useMediasoup";
@@ -9,9 +10,12 @@ import { Button } from "@/components/ui/button";
 
 export default function RoomUI() {
   const peers = useRoomStore((s) => s.peers);
+  const roomId = useRoomStore((s) => s.roomId);
+
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const {
     get_router_capabilities,
@@ -22,7 +26,8 @@ export default function RoomUI() {
     undeafen,
     startScreenShare,
     stopScreenShare,
-    changeScreenShareQuality,
+    setScreenMaxQuality,
+    setViewerQuality,
   } = useMediasoup();
 
   const n = peers.length;
@@ -111,13 +116,20 @@ export default function RoomUI() {
         ) : n === 1 ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="w-full max-w-2xl">
-              <RoomPeerCard peer={peers[0]} />
+              <RoomPeerCard
+                peer={peers[0]}
+                setViewerQuality={setViewerQuality}
+              />
             </div>
           </div>
         ) : (
           <div className={`grid gap-2 sm:gap-3 w-full ${gridCols()}`}>
             {peers.map((peer) => (
-              <RoomPeerCard key={peer.userId} peer={peer} />
+              <RoomPeerCard
+                key={peer.userId}
+                peer={peer}
+                setViewerQuality={setViewerQuality}
+              />
             ))}
           </div>
         )}
@@ -132,7 +144,15 @@ export default function RoomUI() {
         undeafen={undeafen}
         startScreenShare={startScreenShare}
         stopScreenShare={stopScreenShare}
-        changeScreenShareQuality={changeScreenShareQuality}
+        setScreenMaxQuality={setScreenMaxQuality}
+        onShareRoom={() => setShareOpen(true)}
+      />
+
+      {/* ── Share Modal ── */}
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        roomId={roomId}
       />
     </div>
   );

@@ -35,6 +35,8 @@ export default function useMediasoup() {
   const cameraProducerRef = useRef<mediasoup.types.Producer | null>(null);
   const screenProducerRef = useRef<mediasoup.types.Producer | null>(null);
 
+  const screenVideoTrackRef = useRef<MediaStreamTrack | null>(null);
+
   const screenProducerIdRef = useRef<string | null>(null);
 
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -224,16 +226,14 @@ export default function useMediasoup() {
     }
   }
 
-  async function startScreenShare(quality: ScreenQuality = "720p60") {
+  async function startScreenShare() {
     if (!sendTransportRef.current) return;
-
-    const preset = SCREEN_PRESETS[quality];
 
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: {
-        width: { ideal: preset.width },
-        height: { ideal: preset.height },
-        frameRate: { ideal: preset.frameRate },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
       },
       audio: true,
     });
@@ -241,7 +241,8 @@ export default function useMediasoup() {
     const videoTrack = stream.getVideoTracks()[0];
     const audioTrack = stream.getAudioTracks()[0];
 
-    // If user stops sharing via the browser's native "Stop sharing" button
+    screenVideoTrackRef.current = videoTrack;
+
     videoTrack.onended = () => {
       stopScreenShare();
     };
@@ -249,9 +250,15 @@ export default function useMediasoup() {
     const producer = await sendTransportRef.current.produce({
       track: videoTrack,
       appData: { type: "screen", userId },
+
+      encodings: [
+        { rid: "r0", maxBitrate: 500_000, scaleResolutionDownBy: 4 }, // ~480p
+        { rid: "r1", maxBitrate: 1_500_000, scaleResolutionDownBy: 2 }, // ~1080p/2
+        { rid: "r2", maxBitrate: 4_000_000, scaleResolutionDownBy: 1 }, // full 1080p
+      ],
+      codecOptions: { videoGoogleStartBitrate: 1000 },
     });
 
-    // ── FIX 1a: remember our own producerId so stopScreenShare can remove it
     screenProducerIdRef.current = producer.id;
 
     addVideoStream({
@@ -290,16 +297,57 @@ export default function useMediasoup() {
     screenProducerRef.current = null;
   }
 
-  async function changeScreenShareQuality(quality: ScreenQuality) {
-    const track = screenProducerRef.current?.track;
-    if (!track) return;
+  async function setScreenMaxQuality(spatialLayer: 0 | 1 | 2) {
+    const producer = screenProducerRef.current;
+    const track = screenVideoTrackRef.current;
+    if (!producer || !track) return;
 
-    const preset = SCREEN_PRESETS[quality];
+    const qualityMap: Record<
+      0 | 1 | 2,
+      { width: number; height: number; frameRate: number }
+    > = {
+      0: { width: 480, height: 270, frameRate: 10 },
+      1: { width: 960, height: 540, frameRate: 20 },
+      2: { width: 1920, height: 1080, frameRate: 30 },
+    };
+
+    const q = qualityMap[spatialLayer];
+
+    // Check encodings instead of producer.type
+    const isSimulcast =
+      producer.rtpParameters.encodings &&
+      producer.rtpParameters.encodings.length > 1;
+
+    if (isSimulcast) {
+      await producer.setMaxSpatialLayer(spatialLayer);
+    }
 
     await track.applyConstraints({
-      width: { ideal: preset.width },
-      height: { ideal: preset.height },
-      frameRate: { ideal: preset.frameRate },
+      width: { ideal: q.width },
+      height: { ideal: q.height },
+      frameRate: { ideal: q.frameRate },
+    });
+
+    socket.emit("screen:setQuality", {
+      producerId: screenProducerIdRef.current,
+      maxSpatialLayer: spatialLayer,
+    });
+
+    console.log(
+      `Quality set to layer ${spatialLayer}, isSimulcast: ${isSimulcast}, encodings: ${producer.rtpParameters.encodings?.length}`,
+    );
+  }
+
+  // Already in your useMediasoup.ts — no changes needed
+  async function setViewerQuality(producerId: string, layer?: 0 | 1 | 2) {
+    const consumer = [...consumersRef.current.values()].find(
+      (c) => c.producerId === producerId,
+    );
+    if (!consumer) return;
+
+    socket.emit("set-consumer-layers", {
+      consumerId: consumer.id,
+      spatialLayer: layer, // undefined = let mediasoup BWE auto-select
     });
   }
 
@@ -376,6 +424,7 @@ export default function useMediasoup() {
     undeafen,
     startScreenShare,
     stopScreenShare,
-    changeScreenShareQuality,
+    setScreenMaxQuality,
+    setViewerQuality,
   };
 }
