@@ -1,10 +1,8 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import http from "http";
 import app from "./app";
 import { initSocket } from "./socket";
 import { createMediasoupWorkerPool } from "./mediasoup/worker";
-
-dotenv.config();
 
 const PORT = process.env.PORT || 8000;
 

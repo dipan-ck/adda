@@ -13,6 +13,7 @@ import {
   Camera,
   CameraOff,
   Wind,
+  Popcorn,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import {
 import { socket } from "@/lib/socket";
 import { useRoomStore } from "@/store/roomStore";
 import { useState } from "react";
+import WatchPartyModal from "./WatchPartyVideoUploadModal";
 
 export default function RoomMenuDock({
   mute,
@@ -86,6 +88,7 @@ export default function RoomMenuDock({
   const [streamQuality, setStreamQuality] = useState<string>("2");
   const [speakerVolume, setSpeakerVolumeState] = useState(100);
   const [noiseSuppressionEnabled, setNoiseSuppressionEnabled] = useState(false);
+  const [watchPartyOpen, setWatchPartyOpen] = useState(false);
 
   const iconBtn =
     "rounded-xl h-9 w-9 transition-all duration-150 flex-shrink-0";
@@ -155,6 +158,19 @@ export default function RoomMenuDock({
     <TooltipProvider delayDuration={0}>
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
         <div className="flex items-center gap-0.5 px-1.5 py-1.5 bg-popover/95 backdrop-blur border border-border rounded-2xl shadow-xl shadow-black/10">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                onClick={() => setWatchPartyOpen(true)}
+                className="rounded-xl h-9 px-3 gap-1.5 text-xs "
+              >
+                <Popcorn size={15} />
+                Watch Party
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Start a watch party</TooltipContent>
+          </Tooltip>
           {/* ── MIC button + chevron to open noise suppression ── */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -173,7 +189,6 @@ export default function RoomMenuDock({
             </TooltipTrigger>
             <TooltipContent>{isMuted ? "Unmute" : "Mute"}</TooltipContent>
           </Tooltip>
-
           <Popover>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -190,7 +205,6 @@ export default function RoomMenuDock({
             </Tooltip>
             <PopoverContent side="top" align="center" className="w-52 p-3">
               <div className="flex flex-col gap-4">
-                {/* Noise suppression toggle */}
                 <div className="flex items-center justify-between gap-2">
                   <Label
                     htmlFor="noise-suppression"
@@ -208,7 +222,6 @@ export default function RoomMenuDock({
               </div>
             </PopoverContent>
           </Popover>
-
           {/* ── SPEAKER button + chevron to open volume ── */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -229,7 +242,6 @@ export default function RoomMenuDock({
               {isDeafened ? "Undeafen" : "Deafen"}
             </TooltipContent>
           </Tooltip>
-
           <Popover>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -267,10 +279,8 @@ export default function RoomMenuDock({
               </div>
             </PopoverContent>
           </Popover>
-
           {/* ── DIVIDER ── */}
           <div className="w-px h-5 bg-border mx-0.5" />
-
           {/* ── CAMERA ── */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -287,10 +297,8 @@ export default function RoomMenuDock({
               {isCameraOn ? "Stop camera" : "Start camera"}
             </TooltipContent>
           </Tooltip>
-
           {/* ── DIVIDER ── */}
           <div className="w-px h-5 bg-border mx-0.5" />
-
           {/* ── SCREEN SHARE + QUALITY ── */}
           <div className="flex items-center">
             <Tooltip>
@@ -360,10 +368,11 @@ export default function RoomMenuDock({
               </DropdownMenu>
             )}
           </div>
-
           {/* ── DIVIDER ── */}
           <div className="w-px h-5 bg-border mx-0.5" />
-
+          {/* ── WATCH PARTY ── */}
+          {/* ── DIVIDER ── */}
+          <div className="w-px h-5 bg-border mx-0.5" />
           {/* ── SHARE ROOM ── */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -378,10 +387,8 @@ export default function RoomMenuDock({
             </TooltipTrigger>
             <TooltipContent>Invite people</TooltipContent>
           </Tooltip>
-
           {/* ── DIVIDER ── */}
           <div className="w-px h-5 bg-border mx-0.5" />
-
           {/* ── LEAVE ── */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -398,6 +405,12 @@ export default function RoomMenuDock({
           </Tooltip>
         </div>
       </div>
+
+      {/* ── Watch Party Modal ── */}
+      <WatchPartyModal
+        open={watchPartyOpen}
+        onClose={() => setWatchPartyOpen(false)}
+      />
     </TooltipProvider>
   );
 }
